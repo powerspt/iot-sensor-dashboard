@@ -498,10 +498,11 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
     <label>범위 <select id="range">
       <option value="recent">최근</option><option value="1h">최근 1시간</option>
       <option value="24h">최근 24시간</option><option value="today">오늘</option>
-      <option value="date">날짜 지정</option><option value="month">월 지정</option>
+      <option value="date">기간 지정</option><option value="month">월 지정</option>
       <option value="all">전체</option>
     </select></label>
-    <input type="date" id="date" style="display:none">
+    <label id="lfrom" style="display:none">시작 <input type="datetime-local" id="from"></label>
+    <label id="lto" style="display:none">종료 <input type="datetime-local" id="to"></label>
     <input type="month" id="month" style="display:none">
     <label>집계 <select id="bucket">
       <option value="0">원본</option><option value="1000">1초</option>
@@ -533,13 +534,15 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
 </div>
 <script>
 var $=function(id){return document.getElementById(id);};
-var elS=$('sensor'),elR=$('range'),elB=$('bucket'),elDate=$('date'),elMonth=$('month'),
+var elS=$('sensor'),elR=$('range'),elB=$('bucket'),elFrom=$('from'),elTo=$('to'),elMonth=$('month'),
     elTh=$('th'),elMA=$('ma'),elAuto=$('auto'),elView=$('view'),elNorm=$('norm'),chart=$('chart'),lastSeries=[],geo=null;
 var PALETTE=['#6366f1','#0ea5e9','#f97316','#16a34a','#e11d48','#a855f7','#eab308','#14b8a6'],
     STATIC_LEGEND='',HIST_LEGEND='<span>막대 = 빈도</span><span><i class="sw" style="background:#f97316"></i>평균</span>';
 function fmt(x){return (x==null)?'-':(Math.round(x*10)/10);}
 function getTh(){var v=parseFloat(elTh.value);return isNaN(v)?null:v;}
 function tlabel(ms){return new Date(ms).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function dtLocal(ms){var d=new Date(ms);function p(n){return (n<10?'0':'')+n;}
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());}
 function ago(ms){var s=Math.round((Date.now()-ms)/1000);if(s<0)s=0;
   if(s<60)return s+'초 전';if(s<3600)return Math.round(s/60)+'분 전';if(s<86400)return Math.round(s/3600)+'시간 전';return Math.round(s/86400)+'일 전';}
 function copyKey(k,btn){function ok(){btn.textContent='복사됨';setTimeout(function(){btn.textContent='복사';},1200);}
@@ -665,7 +668,7 @@ chart.addEventListener('mouseleave',function(){if(elView.value==='line')drawChar
 function range_(){var r=elR.value,now=Date.now(),from=null,to=null;
   if(r==='1h')from=now-3600e3;else if(r==='24h')from=now-86400e3;
   else if(r==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}
-  else if(r==='date'&&elDate.value){from=new Date(elDate.value+'T00:00:00').getTime();to=from+86400e3;}
+  else if(r==='date'){if(elFrom.value)from=new Date(elFrom.value).getTime();if(elTo.value)to=new Date(elTo.value).getTime();}
   else if(r==='month'&&elMonth.value){var p=elMonth.value.split('-');from=new Date(+p[0],+p[1]-1,1).getTime();to=new Date(+p[0],+p[1],1).getTime();}
   return {from:from,to:to};}
 function qs(){var p=new URLSearchParams();if(elS.value)p.set('sensor',elS.value);
@@ -696,8 +699,12 @@ var timer=null;
 function reschedule(){if(timer){clearInterval(timer);timer=null;}var iv=+elAuto.value;if(iv>0)timer=setInterval(tick,iv);}
 async function tick(){await loadSensors();await refresh();}
 function setDark(on){document.body.classList.toggle('dark',on);localStorage.setItem('dash_dark',on?'1':'0');drawChart(lastSeries,null);}
-elR.addEventListener('change',function(){elDate.style.display=(elR.value==='date')?'':'none';elMonth.style.display=(elR.value==='month')?'':'none';refresh();});
-[elS,elB,elDate,elMonth,elTh,elMA,elView,elNorm].forEach(function(e){e.addEventListener('change',refresh);});
+elR.addEventListener('change',function(){var d=(elR.value==='date');
+  $('lfrom').style.display=d?'':'none';$('lto').style.display=d?'':'none';
+  elMonth.style.display=(elR.value==='month')?'':'none';
+  if(d&&!elFrom.value&&!elTo.value){elFrom.value=dtLocal(Date.now()-3600e3);elTo.value=dtLocal(Date.now());}
+  refresh();});
+[elS,elB,elFrom,elTo,elMonth,elTh,elMA,elView,elNorm].forEach(function(e){e.addEventListener('change',refresh);});
 elAuto.addEventListener('change',reschedule);
 $('refreshBtn').addEventListener('click',tick);
 $('darkBtn').addEventListener('click',function(){setDark(!document.body.classList.contains('dark'));});
