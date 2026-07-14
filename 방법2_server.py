@@ -38,6 +38,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            org TEXT NOT NULL DEFAULT '',
+            email TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'approved',
             is_admin INTEGER NOT NULL DEFAULT 0)""")
         c.execute("""CREATE TABLE IF NOT EXISTS api_keys(
             key TEXT PRIMARY KEY,
@@ -50,10 +54,15 @@ def init_db():
             ts TEXT NOT NULL,
             sensor TEXT NOT NULL,
             value REAL NOT NULL)""")
-        # 기존 DB 호환: is_admin 컬럼이 없으면 추가
+        # 기존 DB 호환: 없는 컬럼 자동 추가 (기존 사용자는 승인됨 상태 유지)
         cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
-        if "is_admin" not in cols:
-            c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        for col, ddl in [("name", "TEXT NOT NULL DEFAULT ''"),
+                         ("org", "TEXT NOT NULL DEFAULT ''"),
+                         ("email", "TEXT NOT NULL DEFAULT ''"),
+                         ("status", "TEXT NOT NULL DEFAULT 'approved'"),
+                         ("is_admin", "INTEGER NOT NULL DEFAULT 0")]:
+            if col not in cols:
+                c.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
 
 
 def seed_admin():
@@ -65,12 +74,13 @@ def seed_admin():
     with db() as c:
         row = c.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone()
         if row:
-            # .env 값을 기준으로 비밀번호 갱신 + 관리자 유지
-            c.execute("UPDATE users SET password_hash=?, is_admin=1 WHERE id=?",
+            # .env 값을 기준으로 비밀번호 갱신 + 관리자·승인 유지
+            c.execute("UPDATE users SET password_hash=?, is_admin=1, status='approved' WHERE id=?",
                       (generate_password_hash(p), row["id"]))
         else:
-            cur = c.execute("INSERT INTO users(username, password_hash, is_admin) VALUES(?,?,1)",
-                            (u, generate_password_hash(p)))
+            cur = c.execute("""INSERT INTO users(username, password_hash, name, org, email, status, is_admin)
+                               VALUES(?,?,?,?,?, 'approved', 1)""",
+                            (u, generate_password_hash(p), "관리자", "", ""))
             c.execute("INSERT INTO api_keys(key, user_id, label, created) VALUES(?,?,?,?)",
                       ("stu_" + secrets.token_hex(12), cur.lastrowid, "admin 기본 키",
                        datetime.datetime.now().isoformat(timespec="seconds")))
@@ -105,28 +115,37 @@ def login_required(f):
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        u = (request.form.get("username") or "").strip()
-        p = request.form.get("password") or ""
-        if len(u) < 3 or len(p) < 4:
-            return render_template_string(PAGE_AUTH, mode="register",
-                   msg="아이디 3자 이상, 비밀번호 4자 이상")
+        f = request.form
+        u = (f.get("username") or "").strip()
+        name = (f.get("name") or "").strip()
+        org = (f.get("org") or "").strip()
+        email = (f.get("email") or "").strip()
+        p = f.get("password") or ""
+        p2 = f.get("password2") or ""
+
+        def again(msg):   # 입력값을 유지한 채 오류 표시
+            return render_template_string(PAGE_AUTH, mode="register", msg=msg, form=f)
+
+        if not name or not org or not email:
+            return again("이름·소속·이메일을 모두 입력하세요")
+        if "@" not in email or "." not in email:
+            return again("이메일 형식을 확인하세요")
+        if len(u) < 3:
+            return again("아이디는 3자 이상")
+        if len(p) < 4:
+            return again("비밀번호는 4자 이상")
+        if p != p2:
+            return again("비밀번호가 서로 다릅니다. 다시 확인하세요")
         try:
             with db() as c:
-                cur = c.execute("INSERT INTO users(username, password_hash) VALUES(?,?)",
-                                (u, generate_password_hash(p)))
-                uid = cur.lastrowid
-                # 가입 시 API 키 1개 자동 발급
-                c.execute("INSERT INTO api_keys(key, user_id, label, created) VALUES(?,?,?,?)",
-                          ("stu_" + secrets.token_hex(12), uid, "기본 키",
-                           datetime.datetime.now().isoformat(timespec="seconds")))
+                c.execute("""INSERT INTO users(username, password_hash, name, org, email, status, is_admin)
+                             VALUES(?,?,?,?,?, 'pending', 0)""",
+                          (u, generate_password_hash(p), name, org, email))
         except sqlite3.IntegrityError:
-            return render_template_string(PAGE_AUTH, mode="register",
-                   msg="이미 있는 아이디입니다")
-        session["user_id"] = uid
-        session["username"] = u
-        session["is_admin"] = False
-        return redirect(url_for("dashboard"))
-    return render_template_string(PAGE_AUTH, mode="register", msg="")
+            return again("이미 있는 아이디입니다")
+        # 승인 대기 — 자동 로그인하지 않음
+        return render_template_string(PAGE_PENDING)
+    return render_template_string(PAGE_AUTH, mode="register", msg="", form={})
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -137,12 +156,16 @@ def login():
         with db() as c:
             row = c.execute("SELECT * FROM users WHERE username=?", (u,)).fetchone()
         if row and check_password_hash(row["password_hash"], p):
+            if row["status"] != "approved":
+                return render_template_string(PAGE_AUTH, mode="login",
+                       msg="관리자 승인 대기 중입니다. 승인 후 로그인하세요.", form=request.form)
             session["user_id"] = row["id"]
             session["username"] = row["username"]
             session["is_admin"] = bool(row["is_admin"])
             return redirect(url_for("dashboard"))
-        return render_template_string(PAGE_AUTH, mode="login", msg="아이디/비밀번호 확인")
-    return render_template_string(PAGE_AUTH, mode="login", msg="")
+        return render_template_string(PAGE_AUTH, mode="login",
+               msg="아이디/비밀번호 확인", form=request.form)
+    return render_template_string(PAGE_AUTH, mode="login", msg="", form={})
 
 
 @app.route("/logout")
@@ -236,20 +259,77 @@ def dashboard():
                                   is_admin=session.get("is_admin", False))
 
 
+def _new_key(c, uid, label="기본 키"):
+    c.execute("INSERT INTO api_keys(key, user_id, label, created) VALUES(?,?,?,?)",
+              ("stu_" + secrets.token_hex(12), uid, label,
+               datetime.datetime.now().isoformat(timespec="seconds")))
+
+
 @app.route("/admin")
 @admin_required
 def admin():
     with db() as c:
-        rows = c.execute("""
-            SELECT u.username, u.is_admin,
-                   COUNT(r.id) AS n,
-                   MAX(r.ts)   AS last_ts,
+        pending = c.execute("""SELECT id, username, name, org, email
+                               FROM users WHERE status='pending' ORDER BY id""").fetchall()
+        members = c.execute("""
+            SELECT u.id, u.username, u.name, u.org, u.is_admin,
+                   COUNT(r.id) AS n, MAX(r.ts) AS last_ts,
                    (SELECT value FROM readings r2 WHERE r2.user_id = u.id
                     ORDER BY r2.id DESC LIMIT 1) AS last_v
             FROM users u LEFT JOIN readings r ON r.user_id = u.id
+            WHERE u.status='approved'
             GROUP BY u.id ORDER BY u.username""").fetchall()
     return render_template_string(PAGE_ADMIN, username=session["username"],
-                                  rows=[dict(r) for r in rows])
+                                  pending=[dict(r) for r in pending],
+                                  members=[dict(r) for r in members],
+                                  msg=request.args.get("msg", ""))
+
+
+@app.route("/admin/approve", methods=["POST"])
+@admin_required
+def admin_approve():
+    uid = request.form.get("user_id")
+    with db() as c:
+        c.execute("UPDATE users SET status='approved' WHERE id=?", (uid,))
+        if not c.execute("SELECT 1 FROM api_keys WHERE user_id=?", (uid,)).fetchone():
+            _new_key(c, uid)          # 승인 시 API 키 발급
+    return redirect(url_for("admin", msg="승인했습니다."))
+
+
+@app.route("/admin/reject", methods=["POST"])
+@admin_required
+def admin_reject():
+    uid = request.form.get("user_id")
+    with db() as c:
+        # 관리자 계정은 삭제 금지
+        if c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]:
+            return redirect(url_for("admin", msg="관리자 계정은 삭제할 수 없습니다."))
+        c.execute("DELETE FROM api_keys WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM readings WHERE user_id=?", (uid,))
+        c.execute("DELETE FROM users WHERE id=?", (uid,))
+    return redirect(url_for("admin", msg="삭제(거절)했습니다."))
+
+
+@app.route("/admin/create", methods=["POST"])
+@admin_required
+def admin_create():
+    f = request.form
+    u = (f.get("username") or "").strip()
+    name = (f.get("name") or "").strip()
+    org = (f.get("org") or "").strip()
+    email = (f.get("email") or "").strip()
+    p = f.get("password") or ""
+    if len(u) < 3 or len(p) < 4 or not name:
+        return redirect(url_for("admin", msg="아이디 3자·비밀번호 4자·이름은 필수입니다."))
+    try:
+        with db() as c:
+            cur = c.execute("""INSERT INTO users(username, password_hash, name, org, email, status, is_admin)
+                               VALUES(?,?,?,?,?, 'approved', 0)""",
+                            (u, generate_password_hash(p), name, org, email))
+            _new_key(c, cur.lastrowid)
+    except sqlite3.IntegrityError:
+        return redirect(url_for("admin", msg="이미 있는 아이디입니다."))
+    return redirect(url_for("admin", msg=f"'{u}' 계정을 생성했습니다(승인됨)."))
 
 
 # ================= 페이지(템플릿) =================
@@ -262,14 +342,32 @@ button{width:100%;background:#4f46e5;color:#fff;border:0;border-radius:10px;padd
 .msg{color:#be123c;font-size:13.5px;min-height:18px;margin:4px 0}a{color:#4338ca;font-size:13.5px}</style></head><body>
 <form class="box" method="post">
 <h1>{{ '회원가입' if mode=='register' else '로그인' }} · 센서 대시보드</h1>
-<input name="username" placeholder="아이디" autocomplete="username">
-<input name="password" type="password" placeholder="비밀번호" autocomplete="current-password">
+{% if mode=='register' %}
+<input name="name" placeholder="이름" value="{{ form.get('name','') }}" required>
+<input name="org" placeholder="소속 (학교 / 반 등)" value="{{ form.get('org','') }}" required>
+<input name="email" type="email" placeholder="이메일" value="{{ form.get('email','') }}" required>
+{% endif %}
+<input name="username" placeholder="아이디" value="{{ form.get('username','') }}" autocomplete="username" required>
+<input name="password" type="password" placeholder="비밀번호 (4자 이상)" autocomplete="{{ 'new-password' if mode=='register' else 'current-password' }}" required>
+{% if mode=='register' %}<input name="password2" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required>{% endif %}
 <div class="msg">{{ msg }}</div>
-<button type="submit">{{ '가입하기' if mode=='register' else '로그인' }}</button>
+<button type="submit">{{ '가입 신청' if mode=='register' else '로그인' }}</button>
 <p style="text-align:center;margin:14px 0 0">
 {% if mode=='register' %}이미 계정이 있나요? <a href="/login">로그인</a>
 {% else %}처음이신가요? <a href="/register">회원가입</a>{% endif %}</p>
 </form></body></html>"""
+
+PAGE_PENDING = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>가입 신청 완료</title>
+<style>body{margin:0;font-family:"Malgun Gothic",system-ui,sans-serif;background:#f6f7fb;color:#1b1f33;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.box{background:#fff;border:1px solid #e6e7f0;border-radius:16px;padding:32px;width:380px;text-align:center;box-shadow:0 10px 30px rgba(30,27,75,.08)}
+h1{font-size:22px;margin:0 0 10px}p{color:#5f6478;margin:6px 0}a{display:inline-block;margin-top:16px;color:#fff;background:#4f46e5;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:700}</style>
+</head><body><div class="box">
+<h1>✅ 가입 신청이 접수되었습니다</h1>
+<p>관리자 <b>승인</b> 후 로그인할 수 있습니다.</p>
+<p style="font-size:13.5px">승인되면 로그인해서 <b>내 API 키</b>를 확인하세요.</p>
+<a href="/login">로그인 화면으로</a>
+</div></body></html>"""
 
 PAGE_DASH = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>내 센서 대시보드</title>
@@ -322,28 +420,62 @@ setInterval(refresh,2000);refresh();
 </script></body></html>"""
 
 PAGE_ADMIN = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>학급 현황 (관리자)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 · 회원/승인</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:"Malgun Gothic",system-ui,sans-serif;background:#f6f7fb;color:#1b1f33}
 header{background:linear-gradient(135deg,#0e7490,#4338ca);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}
 header h1{margin:0;font-size:20px}header a{color:#d9f2f7;font-size:14px;text-decoration:none}
-.wrap{max-width:900px;margin:0 auto;padding:20px}
-table{border-collapse:collapse;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(30,27,75,.06)}
-th,td{border-bottom:1px solid #eef0f5;padding:11px 14px;text-align:left;font-size:14.5px}
-th{background:#f2f2ff;color:#4338ca;font-weight:700}tr:last-child td{border-bottom:0}
-.tag{font-size:11.5px;font-weight:800;color:#5b21b6;background:#ede9fe;border-radius:8px;padding:2px 8px;margin-left:6px}
-.muted{color:#9aa3b2}</style></head><body>
-<header><h1>📊 학급 현황 <span style="opacity:.7;font-size:14px">· 관리자</span></h1>
+.wrap{max-width:920px;margin:0 auto;padding:20px}
+h2{font-size:17px;margin:24px 0 8px}
+.panel{background:#fff;border:1px solid #e6e7f0;border-radius:14px;padding:6px 4px;box-shadow:0 4px 14px rgba(30,27,75,.05)}
+table{border-collapse:collapse;width:100%}
+th,td{border-bottom:1px solid #eef0f5;padding:10px 14px;text-align:left;font-size:14px;vertical-align:middle}
+th{background:#f7f7ff;color:#4338ca;font-weight:700}tr:last-child td{border-bottom:0}
+.tag{font-size:11px;font-weight:800;color:#5b21b6;background:#ede9fe;border-radius:8px;padding:2px 8px;margin-left:6px}
+.muted{color:#9aa3b2}.badge-n{font-size:12px;background:#fef3c7;color:#92400e;border-radius:999px;padding:2px 9px;font-weight:800;margin-left:6px}
+button{border:0;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.ok{background:#16a34a;color:#fff}.no{background:#e11d48;color:#fff;margin-left:6px}
+.msg{background:#e0f2fe;border:1px solid #bae0f7;color:#075985;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:14px}
+form.inline{display:inline}
+.create{display:grid;grid-template-columns:repeat(5,1fr) auto;gap:8px;padding:14px}
+.create input{padding:9px;border:1px solid #cbcfe0;border-radius:8px;font-size:13.5px;width:100%}
+@media(max-width:760px){.create{grid-template-columns:1fr 1fr}}</style></head><body>
+<header><h1>🛠 관리자 · 회원/승인</h1>
 <div><b>{{ username }}</b> 님 · <a href="/dashboard">내 대시보드</a> · <a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
-<p class="muted">전체 학생의 데이터 수집 현황입니다. (총 {{ rows|length }}명)</p>
-<table><tr><th>학생</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th></tr>
-{% for r in rows %}<tr>
-<td>{{ r.username }}{% if r.is_admin %}<span class="tag">admin</span>{% endif %}</td>
-<td>{{ r.n }}</td>
-<td>{{ '%.1f'|format(r.last_v) if r.last_v is not none else '-' }}</td>
-<td>{{ r.last_ts or '-' }}</td>
+{% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
+
+<h2>승인 대기 {% if pending %}<span class="badge-n">{{ pending|length }}</span>{% endif %}</h2>
+<div class="panel"><table>
+<tr><th>이름</th><th>소속</th><th>이메일</th><th>아이디</th><th style="width:150px">처리</th></tr>
+{% for u in pending %}<tr>
+<td>{{ u.name }}</td><td>{{ u.org }}</td><td>{{ u.email }}</td><td>{{ u.username }}</td>
+<td>
+<form class="inline" method="post" action="/admin/approve"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="ok">승인</button></form>
+<form class="inline" method="post" action="/admin/reject"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="no">거절</button></form>
+</td></tr>{% else %}<tr><td colspan="5" class="muted">대기 중인 신청이 없습니다.</td></tr>{% endfor %}
+</table></div>
+
+<h2>회원 직접 생성 (즉시 승인)</h2>
+<div class="panel"><form class="create" method="post" action="/admin/create">
+<input name="name" placeholder="이름" required>
+<input name="org" placeholder="소속">
+<input name="email" type="email" placeholder="이메일">
+<input name="username" placeholder="아이디(3자+)" required>
+<input name="password" type="password" placeholder="비밀번호(4자+)" required>
+<button class="ok" type="submit">생성</button>
+</form></div>
+
+<h2>회원 목록 · 수집 현황 <span class="muted" style="font-size:13px">(총 {{ members|length }}명)</span></h2>
+<div class="panel"><table>
+<tr><th>이름</th><th>소속</th><th>아이디</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th></tr>
+{% for m in members %}<tr>
+<td>{{ m.name or '-' }}{% if m.is_admin %}<span class="tag">admin</span>{% endif %}</td>
+<td>{{ m.org or '-' }}</td><td>{{ m.username }}</td>
+<td>{{ m.n }}</td>
+<td>{{ '%.1f'|format(m.last_v) if m.last_v is not none else '-' }}</td>
+<td>{{ m.last_ts or '-' }}</td>
 </tr>{% endfor %}
-</table>
+</table></div>
 </div></body></html>"""
 
 
