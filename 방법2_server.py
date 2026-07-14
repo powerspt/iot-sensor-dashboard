@@ -53,8 +53,9 @@ def init_db():
             user_id INTEGER NOT NULL,
             ts TEXT NOT NULL,
             sensor TEXT NOT NULL,
-            value REAL NOT NULL)""")
-        # 기존 DB 호환: 없는 컬럼 자동 추가 (기존 사용자는 승인됨 상태 유지)
+            value REAL NOT NULL,
+            epoch_ms INTEGER)""")
+        # 기존 DB 호환: users 없는 컬럼 자동 추가 (기존 사용자는 승인됨 유지)
         cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
         for col, ddl in [("name", "TEXT NOT NULL DEFAULT ''"),
                          ("org", "TEXT NOT NULL DEFAULT ''"),
@@ -63,6 +64,15 @@ def init_db():
                          ("is_admin", "INTEGER NOT NULL DEFAULT 0")]:
             if col not in cols:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+        # readings: epoch_ms(밀리초 정밀 시간) 없으면 추가 + 기존 행 ts로 보정
+        rcols = [r[1] for r in c.execute("PRAGMA table_info(readings)").fetchall()]
+        if "epoch_ms" not in rcols:
+            c.execute("ALTER TABLE readings ADD COLUMN epoch_ms INTEGER")
+            c.execute("UPDATE readings SET epoch_ms = CAST(strftime('%s', ts) AS INTEGER)*1000 "
+                      "WHERE epoch_ms IS NULL")
+        # 조회 성능용 인덱스
+        c.execute("CREATE INDEX IF NOT EXISTS idx_readings_uq "
+                  "ON readings(user_id, sensor, epoch_ms)")
 
 
 def seed_admin():
@@ -205,34 +215,67 @@ def api_ingest():
         value = float(data.get("value"))
     except (TypeError, ValueError):
         return jsonify(ok=False, error="value(숫자)가 필요합니다"), 400
-    ts = datetime.datetime.now().isoformat(timespec="seconds")
+    now = datetime.datetime.now()
+    ts = now.isoformat(timespec="milliseconds")     # 사람이 읽는 시간(밀리초)
+    epoch_ms = int(now.timestamp() * 1000)          # 정밀 시간(집계·필터용)
     with db() as c:
-        c.execute("INSERT INTO readings(user_id, ts, sensor, value) VALUES(?,?,?,?)",
-                  (row["user_id"], ts, sensor, value))
+        c.execute("INSERT INTO readings(user_id, ts, sensor, value, epoch_ms) VALUES(?,?,?,?,?)",
+                  (row["user_id"], ts, sensor, value, epoch_ms))
     return jsonify(ok=True)
 
 
 # ================= 브라우저 → 서버 : 내 데이터만 =================
+def _where():
+    """요청 파라미터(sensor, from, to)로 WHERE 절과 값 목록 구성."""
+    clauses = ["user_id=?"]
+    params = [session["user_id"]]
+    sensor = request.args.get("sensor")
+    if sensor:
+        clauses.append("sensor=?"); params.append(sensor)
+    fr, to = request.args.get("from"), request.args.get("to")
+    if fr:
+        clauses.append("epoch_ms>=?"); params.append(int(fr))
+    if to:
+        clauses.append("epoch_ms<=?"); params.append(int(to))
+    return " AND ".join(clauses), params
+
+
+@app.route("/api/my/sensors")
+@login_required
+def my_sensors():
+    with db() as c:
+        rows = c.execute("SELECT DISTINCT sensor FROM readings WHERE user_id=? ORDER BY sensor",
+                         (session["user_id"],)).fetchall()
+    return jsonify([r["sensor"] for r in rows])
+
+
 @app.route("/api/my/series")
 @login_required
 def my_series():
-    limit = min(int(request.args.get("limit", 120)), 2000)
+    where, params = _where()
+    bucket = int(request.args.get("bucket", 0) or 0)     # ms, 0=원본
+    limit = min(int(request.args.get("limit", 500)), 5000)
     with db() as c:
-        rows = c.execute("""SELECT ts, value FROM readings
-                            WHERE user_id=? ORDER BY id DESC LIMIT ?""",
-                         (session["user_id"], limit)).fetchall()
-    rows = rows[::-1]
-    return jsonify([{"ts": r["ts"], "value": r["value"]} for r in rows])
+        if bucket > 0:                                   # 집계(구간 평균)
+            q = (f"SELECT (epoch_ms/{bucket}) AS b, AVG(value) AS v, MAX(epoch_ms) AS t "
+                 f"FROM readings WHERE {where} AND epoch_ms IS NOT NULL "
+                 f"GROUP BY b ORDER BY b DESC LIMIT ?")
+        else:                                            # 원본
+            q = (f"SELECT epoch_ms AS t, value AS v FROM readings WHERE {where} "
+                 f"ORDER BY id DESC LIMIT ?")
+        rows = c.execute(q, (*params, limit)).fetchall()[::-1]
+    return jsonify([{"t": r["t"], "v": r["v"]} for r in rows])
 
 
 @app.route("/api/my/stats")
 @login_required
 def my_stats():
+    where, params = _where()
     with db() as c:
-        r = c.execute("""SELECT COUNT(*) n, AVG(value) avg, MIN(value) mn, MAX(value) mx
-                         FROM readings WHERE user_id=?""", (session["user_id"],)).fetchone()
-        last = c.execute("""SELECT value FROM readings WHERE user_id=?
-                            ORDER BY id DESC LIMIT 1""", (session["user_id"],)).fetchone()
+        r = c.execute(f"""SELECT COUNT(*) n, AVG(value) avg, MIN(value) mn, MAX(value) mx
+                          FROM readings WHERE {where}""", params).fetchone()
+        last = c.execute(f"SELECT value FROM readings WHERE {where} ORDER BY id DESC LIMIT 1",
+                         params).fetchone()
     return jsonify(count=r["n"], avg=r["avg"], min=r["mn"], max=r["mx"],
                    last=(last["value"] if last else None))
 
@@ -240,9 +283,10 @@ def my_stats():
 @app.route("/export.csv")
 @login_required
 def export_csv():
+    where, params = _where()
     with db() as c:
-        rows = c.execute("""SELECT ts, sensor, value FROM readings
-                            WHERE user_id=? ORDER BY id""", (session["user_id"],)).fetchall()
+        rows = c.execute(f"SELECT ts, sensor, value FROM readings WHERE {where} ORDER BY id",
+                         params).fetchall()
     lines = ["time,sensor,value"] + [f'{r["ts"]},{r["sensor"]},{r["value"]}' for r in rows]
     return Response("\n".join(lines), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=my_data.csv"})
@@ -296,18 +340,37 @@ def admin_approve():
     return redirect(url_for("admin", msg="승인했습니다."))
 
 
-@app.route("/admin/reject", methods=["POST"])
+@app.route("/admin/delete", methods=["POST"])
 @admin_required
-def admin_reject():
+def admin_delete():
+    """계정 삭제 (승인 대기 거절 · 회원 삭제 공통). 관리자 계정은 보호."""
     uid = request.form.get("user_id")
     with db() as c:
-        # 관리자 계정은 삭제 금지
-        if c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]:
+        r = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+        if not r:
+            return redirect(url_for("admin", msg="이미 없는 계정입니다."))
+        if r["is_admin"]:
             return redirect(url_for("admin", msg="관리자 계정은 삭제할 수 없습니다."))
         c.execute("DELETE FROM api_keys WHERE user_id=?", (uid,))
         c.execute("DELETE FROM readings WHERE user_id=?", (uid,))
         c.execute("DELETE FROM users WHERE id=?", (uid,))
-    return redirect(url_for("admin", msg="삭제(거절)했습니다."))
+    return redirect(url_for("admin", msg="계정을 삭제했습니다(데이터 포함)."))
+
+
+@app.route("/admin/reset_password", methods=["POST"])
+@admin_required
+def admin_reset_password():
+    """비밀번호 초기화 — 임시 비밀번호를 새로 만들어 화면에 표시(관리자가 학생에게 전달)."""
+    uid = request.form.get("user_id")
+    temp = secrets.token_urlsafe(6)                 # 임시 비밀번호(8자 안팎)
+    with db() as c:
+        row = c.execute("SELECT username FROM users WHERE id=?", (uid,)).fetchone()
+        if not row:
+            return redirect(url_for("admin", msg="이미 없는 계정입니다."))
+        c.execute("UPDATE users SET password_hash=? WHERE id=?",
+                  (generate_password_hash(temp), uid))
+    return redirect(url_for("admin",
+                    msg=f"'{row['username']}' 임시 비밀번호: {temp}  (학생에게 전달 후 변경 안내)"))
 
 
 @app.route("/admin/create", methods=["POST"])
@@ -386,41 +449,85 @@ header h1{margin:0;font-size:20px}header a{color:#d9f2f7;font-size:14px;text-dec
 canvas{width:100%;height:auto;display:block}
 .bar{display:flex;gap:12px;align-items:center;margin-top:14px}
 button{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:9px 15px;font-weight:700;cursor:pointer}
+.ctrl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:16px}
+.ctrl label{font-size:13px;color:var(--muted);font-weight:700;display:flex;gap:6px;align-items:center}
+.ctrl select,.ctrl input{padding:7px 9px;border:1px solid #cbcfe0;border-radius:8px;font-size:13.5px}
 #status{color:var(--muted);font-size:13px}</style></head><body>
-<header><h1>📈 내 센서 대시보드</h1><div><b>{{ username }}</b> 님 · {% if is_admin %}<a href="/admin">학급 현황</a> · {% endif %}<a href="/logout">로그아웃</a></div></header>
+<header><h1>📈 내 센서 대시보드</h1><div><b>{{ username }}</b> 님 · {% if is_admin %}<a href="/admin">회원 관리</a> · {% endif %}<a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
   <div class="keybox"><b>내 API 키</b> (ESP32 코드의 <code>API_KEY</code>에 붙여넣기)
     {% for k in keys %}<div style="margin-top:8px"><code>{{ k.key }}</code> <span style="color:#5f6478;font-size:13px">— {{ k.label }}</span></div>{% endfor %}
     <form method="post" action="/keys/new" style="margin-top:10px"><button type="submit">+ 새 키 발급</button></form>
   </div>
+  <div class="ctrl">
+    <label>센서 <select id="sensor"></select></label>
+    <label>범위 <select id="range">
+      <option value="recent">최근</option><option value="1h">최근 1시간</option>
+      <option value="24h">최근 24시간</option><option value="today">오늘</option>
+      <option value="date">날짜 지정</option><option value="month">월 지정</option>
+      <option value="all">전체</option>
+    </select></label>
+    <input type="date" id="date" style="display:none">
+    <input type="month" id="month" style="display:none">
+    <label>집계 <select id="bucket">
+      <option value="0">원본</option><option value="1000">1초</option>
+      <option value="10000">10초</option><option value="30000">30초</option>
+      <option value="60000">1분</option><option value="300000">5분</option>
+      <option value="3600000">1시간</option><option value="86400000">1일</option>
+    </select></label>
+  </div>
   <div class="cards" id="cards"></div>
   <div class="panel"><canvas id="chart" width="900" height="320"></canvas></div>
-  <div class="bar"><button onclick="location.href='/export.csv'">⬇ 내 데이터 CSV</button><span id="status">연결 중…</span></div>
+  <div class="bar"><button onclick="location.href='/export.csv?'+qs()">⬇ CSV 내보내기</button><span id="status">연결 중…</span></div>
 </div>
 <script>
+var elS=document.getElementById('sensor'),elR=document.getElementById('range'),elB=document.getElementById('bucket'),
+    elDate=document.getElementById('date'),elMonth=document.getElementById('month'),chart=document.getElementById('chart');
 function card(k,v){return '<div class="card"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';}
 function fmt(x){return (x==null)?'-':(Math.round(x*10)/10);}
 function renderCards(s){document.getElementById('cards').innerHTML=
   card('현재값',fmt(s.last))+card('평균',fmt(s.avg))+card('최소',fmt(s.min))+card('최대',fmt(s.max))+card('샘플 수',s.count);}
-function drawChart(v){var c=document.getElementById('chart'),ctx=c.getContext('2d');var W=c.width,H=c.height,pad=40;
+function range_(){var r=elR.value,now=Date.now(),from=null,to=null;
+  if(r==='1h')from=now-3600e3;
+  else if(r==='24h')from=now-86400e3;
+  else if(r==='today'){var d=new Date();d.setHours(0,0,0,0);from=d.getTime();}
+  else if(r==='date'&&elDate.value){from=new Date(elDate.value+'T00:00:00').getTime();to=from+86400e3;}
+  else if(r==='month'&&elMonth.value){var p=elMonth.value.split('-');from=new Date(+p[0],+p[1]-1,1).getTime();to=new Date(+p[0],+p[1],1).getTime();}
+  return {from:from,to:to};}
+function qs(){var p=new URLSearchParams();if(elS.value)p.set('sensor',elS.value);
+  var rg=range_();if(rg.from)p.set('from',Math.floor(rg.from));if(rg.to)p.set('to',Math.floor(rg.to));
+  p.set('bucket',elB.value);p.set('limit',(elR.value==='recent')?'150':'3000');return p.toString();}
+function tlabel(ms){var d=new Date(ms);return d.toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}
+function drawChart(pts){var ctx=chart.getContext('2d'),W=chart.width,H=chart.height,pad=44;
   ctx.clearRect(0,0,W,H);
-  if(v.length<2){ctx.fillStyle='#9aa3b2';ctx.font='16px sans-serif';ctx.fillText('데이터를 기다리는 중…',pad,H/2);return;}
-  var mn=Math.min.apply(null,v),mx=Math.max.apply(null,v),rng=(mx-mn)||1;
+  if(pts.length<2){ctx.fillStyle='#9aa3b2';ctx.font='16px sans-serif';ctx.fillText('데이터가 없습니다',pad,H/2);return;}
+  var vs=pts.map(function(p){return p.v;});
+  var mn=Math.min.apply(null,vs),mx=Math.max.apply(null,vs),rng=(mx-mn)||1;
   ctx.strokeStyle='#e2e6f0';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad,H-pad);ctx.lineTo(W-10,H-pad);ctx.moveTo(pad,10);ctx.lineTo(pad,H-pad);ctx.stroke();
   ctx.strokeStyle='#4f46e5';ctx.lineWidth=2;ctx.beginPath();
-  v.forEach(function(val,i){var x=pad+(W-pad-10)*(i/(v.length-1));var y=(H-pad)-(H-pad-10)*((val-mn)/rng);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
-  ctx.stroke();ctx.fillStyle='#5f6478';ctx.font='12px sans-serif';ctx.fillText(String(Math.round(mx)),6,16);ctx.fillText(String(Math.round(mn)),6,H-pad);}
-async function refresh(){try{
-  var s=await (await fetch('/api/my/stats')).json();
-  var series=await (await fetch('/api/my/series?limit=120')).json();
-  renderCards(s);drawChart(series.map(function(p){return p.value;}));
-  document.getElementById('status').textContent='최근 갱신 '+new Date().toLocaleTimeString();
+  vs.forEach(function(val,i){var x=pad+(W-pad-10)*(i/(vs.length-1));var y=(H-pad)-(H-pad-16)*((val-mn)/rng);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.stroke();
+  ctx.fillStyle='#5f6478';ctx.font='12px sans-serif';ctx.textAlign='left';
+  ctx.fillText(String(Math.round(mx)),6,16);ctx.fillText(String(Math.round(mn)),6,H-pad);
+  ctx.fillText(tlabel(pts[0].t),pad,H-6);
+  ctx.textAlign='right';ctx.fillText(tlabel(pts[pts.length-1].t),W-10,H-6);ctx.textAlign='left';}
+async function loadSensors(){var cur=elS.value;
+  var list=await (await fetch('/api/my/sensors')).json();
+  if(!list.length){elS.innerHTML='<option value="">(데이터 없음)</option>';return;}
+  elS.innerHTML=list.map(function(s){return '<option'+(s===cur?' selected':'')+'>'+s+'</option>';}).join('');}
+async function refresh(){try{var p=qs();
+  var s=await (await fetch('/api/my/stats?'+p)).json();
+  var series=await (await fetch('/api/my/series?'+p)).json();
+  renderCards(s);drawChart(series);
+  document.getElementById('status').textContent='갱신 '+new Date().toLocaleTimeString()+' · '+series.length+'점';
 }catch(e){document.getElementById('status').textContent='대기…';}}
-setInterval(refresh,2000);refresh();
+elR.addEventListener('change',function(){elDate.style.display=(elR.value==='date')?'':'none';elMonth.style.display=(elR.value==='month')?'':'none';refresh();});
+[elS,elB,elDate,elMonth].forEach(function(e){e.addEventListener('change',refresh);});
+(async function(){await loadSensors();await refresh();setInterval(async function(){await loadSensors();await refresh();},2000);})();
 </script></body></html>"""
 
 PAGE_ADMIN = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>관리자 · 회원/승인</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>회원 관리 (관리자)</title>
 <style>*{box-sizing:border-box}body{margin:0;font-family:"Malgun Gothic",system-ui,sans-serif;background:#f6f7fb;color:#1b1f33}
 header{background:linear-gradient(135deg,#0e7490,#4338ca);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}
 header h1{margin:0;font-size:20px}header a{color:#d9f2f7;font-size:14px;text-decoration:none}
@@ -439,7 +546,7 @@ form.inline{display:inline}
 .create{display:grid;grid-template-columns:repeat(5,1fr) auto;gap:8px;padding:14px}
 .create input{padding:9px;border:1px solid #cbcfe0;border-radius:8px;font-size:13.5px;width:100%}
 @media(max-width:760px){.create{grid-template-columns:1fr 1fr}}</style></head><body>
-<header><h1>🛠 관리자 · 회원/승인</h1>
+<header><h1>🛠 회원 관리</h1>
 <div><b>{{ username }}</b> 님 · <a href="/dashboard">내 대시보드</a> · <a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
 {% if msg %}<div class="msg">{{ msg }}</div>{% endif %}
@@ -451,7 +558,7 @@ form.inline{display:inline}
 <td>{{ u.name }}</td><td>{{ u.org }}</td><td>{{ u.email }}</td><td>{{ u.username }}</td>
 <td>
 <form class="inline" method="post" action="/admin/approve"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="ok">승인</button></form>
-<form class="inline" method="post" action="/admin/reject"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="no">거절</button></form>
+<form class="inline" method="post" action="/admin/delete"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="no">거절</button></form>
 </td></tr>{% else %}<tr><td colspan="5" class="muted">대기 중인 신청이 없습니다.</td></tr>{% endfor %}
 </table></div>
 
@@ -467,13 +574,17 @@ form.inline{display:inline}
 
 <h2>회원 목록 · 수집 현황 <span class="muted" style="font-size:13px">(총 {{ members|length }}명)</span></h2>
 <div class="panel"><table>
-<tr><th>이름</th><th>소속</th><th>아이디</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th></tr>
+<tr><th>이름</th><th>소속</th><th>아이디</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th><th style="width:210px">관리</th></tr>
 {% for m in members %}<tr>
 <td>{{ m.name or '-' }}{% if m.is_admin %}<span class="tag">admin</span>{% endif %}</td>
 <td>{{ m.org or '-' }}</td><td>{{ m.username }}</td>
 <td>{{ m.n }}</td>
 <td>{{ '%.1f'|format(m.last_v) if m.last_v is not none else '-' }}</td>
 <td>{{ m.last_ts or '-' }}</td>
+<td>{% if not m.is_admin %}
+<form class="inline" method="post" action="/admin/reset_password"><input type="hidden" name="user_id" value="{{ m.id }}"><button style="background:#0284c7;color:#fff">비번 초기화</button></form>
+<form class="inline" method="post" action="/admin/delete" onsubmit="return confirm('{{ m.username }} 계정과 데이터를 삭제할까요?')"><input type="hidden" name="user_id" value="{{ m.id }}"><button class="no">삭제</button></form>
+{% else %}<span class="muted">—</span>{% endif %}</td>
 </tr>{% endfor %}
 </table></div>
 </div></body></html>"""
