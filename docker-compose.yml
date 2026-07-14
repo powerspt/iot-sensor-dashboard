@@ -34,5 +34,5 @@ services:
     depends_on:
       - dashboard
 # Cloudflare 대시보드에서 이 터널의 Public hostname 을
-#   dashboard.<내도메인>  →  Service: http://dashboard:8000
-# 으로 설정하면, 학생은 https://dashboard.<내도메인> 으로 접속합니다.
+#   dashboard.boram-iot.com  →  Service: http://dashboard:8000
+# 으로 설정하면, 학생은 https://dashboard.boram-iot.com 으로 접속합니다.

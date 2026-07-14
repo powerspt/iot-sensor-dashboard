@@ -1,3 +1,4 @@
+# v1_pc_server.py
 # -*- coding: utf-8 -*-
 """
 방법 1 · 로컬 PC 실시간 센서 대시보드 (수집 서버)
@@ -5,7 +6,7 @@
 ESP32(D1 R32)가 같은 WiFi에서 이 PC로 센서 값을 POST 하면,
 SQLite에 누적하고 브라우저 대시보드(실시간 차트 + 통계)로 보여 줍니다.
 
-실행:  pip install flask   →   python 방법1_pc_server.py
+실행:  pip install flask   →   python v1_pc_server.py
 확인:  같은 PC의 브라우저에서  http://localhost:5000
 장치:  ESP32는  http://<이 PC의 IP>:5000/ingest  로 POST
 ※ 인터넷 없이도 동작합니다(차트는 순수 자바스크립트로 그림).
