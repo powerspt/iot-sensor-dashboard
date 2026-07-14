@@ -1,0 +1,7 @@
+data/
+*.db
+.env
+_t/
+*.log
+방법1_*
+requirements.txt

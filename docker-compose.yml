@@ -1,0 +1,36 @@
+# ============================================================
+# 방법 2 · Docker + Cloudflare Tunnel 배포 (학교 내부망 / 공인 IP 없음)
+# ------------------------------------------------------------
+#  dashboard  : Flask 대시보드 서버(자체 계정). 외부에 포트를 열지 않음.
+#  cloudflared: Cloudflare Tunnel. 서버가 "밖으로 나가는" 연결만 만들어
+#               내 도메인(https)을 dashboard 컨테이너로 연결 → 공인 IP·포트포워딩 불필요.
+#
+#  실행:  docker compose up -d --build
+#  준비:  .env 파일에 SECRET_KEY, TUNNEL_TOKEN 을 채우세요 (.env.example 참고)
+# ============================================================
+services:
+  dashboard:
+    build: .
+    container_name: sensor-dash
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}      # 세션 비밀키(고정·랜덤)
+      - DB_PATH=/app/data/dashboard.db
+    volumes:
+      - ./data:/app/data              # ← 데이터 누적(영속). 이 폴더가 실제 저장소
+    # 외부로 포트를 공개하지 않습니다. 접근은 cloudflared(같은 네트워크)를 통해서만.
+    expose:
+      - "8000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}  # ← Cloudflare Zero Trust에서 발급한 터널 토큰
+    depends_on:
+      - dashboard
+# Cloudflare 대시보드에서 이 터널의 Public hostname 을
+#   dashboard.<내도메인>  →  Service: http://dashboard:8000
+# 으로 설정하면, 학생은 https://dashboard.<내도메인> 으로 접속합니다.
