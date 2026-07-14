@@ -16,6 +16,8 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY}      # 세션 비밀키(고정·랜덤)
       - DB_PATH=/app/data/dashboard.db
+      - ADMIN_USER=${ADMIN_USER:-}         # (선택) 관리자 계정 — .env 에 값이 있으면 자동 생성
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     volumes:
       - ./data:/app/data              # ← 데이터 누적(영속). 이 폴더가 실제 저장소
     # 외부로 포트를 공개하지 않습니다. 접근은 cloudflared(같은 네트워크)를 통해서만.

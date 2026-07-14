@@ -37,7 +37,8 @@ def init_db():
         c.execute("""CREATE TABLE IF NOT EXISTS users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL)""")
+            password_hash TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0)""")
         c.execute("""CREATE TABLE IF NOT EXISTS api_keys(
             key TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL,
@@ -49,10 +50,46 @@ def init_db():
             ts TEXT NOT NULL,
             sensor TEXT NOT NULL,
             value REAL NOT NULL)""")
+        # 기존 DB 호환: is_admin 컬럼이 없으면 추가
+        cols = [r[1] for r in c.execute("PRAGMA table_info(users)").fetchall()]
+        if "is_admin" not in cols:
+            c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
 
 
-# 앱을 import 하는 방식(gunicorn 등)에서도 테이블이 준비되도록 로드 시 1회 초기화
+def seed_admin():
+    """ADMIN_USER / ADMIN_PASSWORD 환경변수가 있으면 관리자 계정을 준비(.env로 하드코딩)."""
+    u = os.environ.get("ADMIN_USER")
+    p = os.environ.get("ADMIN_PASSWORD")
+    if not u or not p:
+        return
+    with db() as c:
+        row = c.execute("SELECT id FROM users WHERE username=?", (u,)).fetchone()
+        if row:
+            # .env 값을 기준으로 비밀번호 갱신 + 관리자 유지
+            c.execute("UPDATE users SET password_hash=?, is_admin=1 WHERE id=?",
+                      (generate_password_hash(p), row["id"]))
+        else:
+            cur = c.execute("INSERT INTO users(username, password_hash, is_admin) VALUES(?,?,1)",
+                            (u, generate_password_hash(p)))
+            c.execute("INSERT INTO api_keys(key, user_id, label, created) VALUES(?,?,?,?)",
+                      ("stu_" + secrets.token_hex(12), cur.lastrowid, "admin 기본 키",
+                       datetime.datetime.now().isoformat(timespec="seconds")))
+
+
+# 앱을 import 하는 방식(gunicorn 등)에서도 준비되도록 로드 시 1회 초기화 + 관리자 시드
 init_db()
+seed_admin()
+
+
+def admin_required(f):
+    @functools.wraps(f)
+    def wrap(*a, **k):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        if not session.get("is_admin"):
+            return ("관리자 전용 페이지입니다.", 403)
+        return f(*a, **k)
+    return wrap
 
 
 def login_required(f):
@@ -87,6 +124,7 @@ def register():
                    msg="이미 있는 아이디입니다")
         session["user_id"] = uid
         session["username"] = u
+        session["is_admin"] = False
         return redirect(url_for("dashboard"))
     return render_template_string(PAGE_AUTH, mode="register", msg="")
 
@@ -101,6 +139,7 @@ def login():
         if row and check_password_hash(row["password_hash"], p):
             session["user_id"] = row["id"]
             session["username"] = row["username"]
+            session["is_admin"] = bool(row["is_admin"])
             return redirect(url_for("dashboard"))
         return render_template_string(PAGE_AUTH, mode="login", msg="아이디/비밀번호 확인")
     return render_template_string(PAGE_AUTH, mode="login", msg="")
@@ -193,7 +232,24 @@ def dashboard():
         keys = c.execute("SELECT key, label FROM api_keys WHERE user_id=? ORDER BY created",
                          (session["user_id"],)).fetchall()
     return render_template_string(PAGE_DASH, username=session["username"],
-                                  keys=[dict(k) for k in keys])
+                                  keys=[dict(k) for k in keys],
+                                  is_admin=session.get("is_admin", False))
+
+
+@app.route("/admin")
+@admin_required
+def admin():
+    with db() as c:
+        rows = c.execute("""
+            SELECT u.username, u.is_admin,
+                   COUNT(r.id) AS n,
+                   MAX(r.ts)   AS last_ts,
+                   (SELECT value FROM readings r2 WHERE r2.user_id = u.id
+                    ORDER BY r2.id DESC LIMIT 1) AS last_v
+            FROM users u LEFT JOIN readings r ON r.user_id = u.id
+            GROUP BY u.id ORDER BY u.username""").fetchall()
+    return render_template_string(PAGE_ADMIN, username=session["username"],
+                                  rows=[dict(r) for r in rows])
 
 
 # ================= 페이지(템플릿) =================
@@ -233,7 +289,7 @@ canvas{width:100%;height:auto;display:block}
 .bar{display:flex;gap:12px;align-items:center;margin-top:14px}
 button{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:9px 15px;font-weight:700;cursor:pointer}
 #status{color:var(--muted);font-size:13px}</style></head><body>
-<header><h1>📈 내 센서 대시보드</h1><div><b>{{ username }}</b> 님 · <a href="/logout">로그아웃</a></div></header>
+<header><h1>📈 내 센서 대시보드</h1><div><b>{{ username }}</b> 님 · {% if is_admin %}<a href="/admin">학급 현황</a> · {% endif %}<a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
   <div class="keybox"><b>내 API 키</b> (ESP32 코드의 <code>API_KEY</code>에 붙여넣기)
     {% for k in keys %}<div style="margin-top:8px"><code>{{ k.key }}</code> <span style="color:#5f6478;font-size:13px">— {{ k.label }}</span></div>{% endfor %}
@@ -264,6 +320,31 @@ async function refresh(){try{
 }catch(e){document.getElementById('status').textContent='대기…';}}
 setInterval(refresh,2000);refresh();
 </script></body></html>"""
+
+PAGE_ADMIN = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>학급 현황 (관리자)</title>
+<style>*{box-sizing:border-box}body{margin:0;font-family:"Malgun Gothic",system-ui,sans-serif;background:#f6f7fb;color:#1b1f33}
+header{background:linear-gradient(135deg,#0e7490,#4338ca);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:center}
+header h1{margin:0;font-size:20px}header a{color:#d9f2f7;font-size:14px;text-decoration:none}
+.wrap{max-width:900px;margin:0 auto;padding:20px}
+table{border-collapse:collapse;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 14px rgba(30,27,75,.06)}
+th,td{border-bottom:1px solid #eef0f5;padding:11px 14px;text-align:left;font-size:14.5px}
+th{background:#f2f2ff;color:#4338ca;font-weight:700}tr:last-child td{border-bottom:0}
+.tag{font-size:11.5px;font-weight:800;color:#5b21b6;background:#ede9fe;border-radius:8px;padding:2px 8px;margin-left:6px}
+.muted{color:#9aa3b2}</style></head><body>
+<header><h1>📊 학급 현황 <span style="opacity:.7;font-size:14px">· 관리자</span></h1>
+<div><b>{{ username }}</b> 님 · <a href="/dashboard">내 대시보드</a> · <a href="/logout">로그아웃</a></div></header>
+<div class="wrap">
+<p class="muted">전체 학생의 데이터 수집 현황입니다. (총 {{ rows|length }}명)</p>
+<table><tr><th>학생</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th></tr>
+{% for r in rows %}<tr>
+<td>{{ r.username }}{% if r.is_admin %}<span class="tag">admin</span>{% endif %}</td>
+<td>{{ r.n }}</td>
+<td>{{ '%.1f'|format(r.last_v) if r.last_v is not none else '-' }}</td>
+<td>{{ r.last_ts or '-' }}</td>
+</tr>{% endfor %}
+</table>
+</div></body></html>"""
 
 
 if __name__ == "__main__":
