@@ -44,7 +44,7 @@ ipconfig        # Windows, "IPv4 주소" 예: 192.168.0.5   (Mac/Linux: ifconfig
 ```
 
 ### 3) ESP32 업로드
-`방법1_esp32.ino`에서 아래를 수정 후 업로드(보드: **ESP32 Dev Module**, 115200):
+`방법1_esp32.ino`에서 아래를 수정 후 업로드(보드: **WEMOS D1 R32** — 없으면 ESP32 Dev Module, 115200):
 ```cpp
 const char* ssid     = "우리집WiFi";
 const char* password = "비밀번호";
