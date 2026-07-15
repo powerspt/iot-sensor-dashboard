@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사물인터넷 중급(대체) · WiFi 데이터 수집 (Arduino D1 R32)</title>
+<style>
+:root{
+  --bg:#f6f7fb; --card:#ffffff; --ink:#1b1f33; --muted:#5f6478; --line:#e6e7f0;
+  --brand:#4f46e5; --brand-d:#4338ca; --brand-l:#e0e7ff; --brand-soft:#f2f2ff;
+  --violet:#7c3aed; --violet-l:#ede9fe;
+  --amber:#d97706; --amber-l:#fef3c7; --amber-soft:#fffbeb;
+  --sky:#0284c7; --sky-l:#e0f2fe; --rose:#e11d48; --rose-l:#ffe4e6;
+  --teal:#0d9488; --teal-l:#ccfbf1; --cyan:#0e7490; --cyan-l:#cffafe;
+  --code-bg:#141326; --code-ink:#e7e6f4; --radius:16px;
+  --shadow:0 1px 2px rgba(30,27,75,.05),0 6px 20px rgba(30,27,75,.07);
+  --mono:"Cascadia Code",ui-monospace,"SFMono-Regular",Consolas,"D2Coding","Nanum Gothic Coding",monospace;
+  --sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.72;font-size:16.5px;-webkit-text-size-adjust:100%}
+.wrap{max-width:940px;margin:0 auto;padding:0 20px}
+h1,h2,h3,h4{line-height:1.35;font-weight:800;letter-spacing:-.01em}
+a{color:var(--brand-d)}
+p{margin:.6em 0}
+strong{font-weight:700}
+code{font-family:var(--mono);background:#eef0fb;color:#33307a;padding:.08em .38em;border-radius:6px;font-size:.9em}
+
+.hero{background:linear-gradient(135deg,#0e7490,#4338ca 60%,#4c1d95);color:#fff;padding:56px 0 46px}
+.eyebrow{display:inline-block;font-weight:700;font-size:14px;letter-spacing:.08em;background:rgba(255,255,255,.16);padding:6px 14px;border-radius:999px;margin-bottom:16px}
+.hero h1{font-size:36px;margin:.1em 0 .15em;color:#fff}
+.hero .sub{font-size:18px;color:#d9f2f7;font-weight:500;margin-bottom:26px}
+.meta{display:flex;flex-wrap:wrap;gap:10px}
+.chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:9px 14px;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:center}
+.chip b{color:#fff}.chip span{color:#bfe6ef;font-weight:600}
+
+section.part{background:var(--card);margin:26px auto;border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.part-head{padding:22px 28px;border-left:6px solid var(--brand);background:linear-gradient(90deg,var(--brand-soft),#fff 70%)}
+.part-head .ses{font-size:13px;font-weight:800;color:var(--brand-d);letter-spacing:.06em}
+.part-head h2{font-size:25px;margin:.15em 0 0}
+.part-head .goalline{color:var(--muted);font-size:15px;margin-top:6px}
+.part-body{padding:8px 28px 30px}
+h3{font-size:20px;margin:1.4em 0 .5em}
+h3 .num{color:var(--brand);font-weight:800;margin-right:.4em}
+h4{font-size:17px;margin:1.2em 0 .4em}
+
+.box{border-radius:14px;padding:15px 18px;margin:16px 0;border:1px solid var(--line);background:#fbfbfe}
+.box .bt{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.box ul,.box ol{margin:.3em 0;padding-left:1.25em}
+.box.goal{background:var(--brand-soft);border-color:#c7cbf5}.box.goal .bt{color:var(--brand-d)}
+.box.tip{background:var(--sky-l);border-color:#bae0f7}.box.tip .bt{color:#075985}
+.box.warn{background:var(--rose-l);border-color:#fbc7d1}.box.warn .bt{color:#be123c}
+.box.concept{background:#f4f5fa;border-color:#e0e2ef}.box.concept .bt{color:#4338ca}
+.box.mission{background:#f5fbe9;border-color:#d7ecb4}.box.mission .bt{color:#4d7c0f}
+.box.parts{background:#fafafa;border-color:#e8e8e8}
+.box.setup{background:#ecfeff;border-color:#a5eef5}.box.setup .bt{color:#0e7490}
+.box.deep{background:#fdf4ff;border-color:#eecff5}.box.deep .bt{color:#a21caf}
+
+.modify{background:var(--amber-soft);border:1px dashed var(--amber);border-radius:14px;padding:15px 18px;margin:16px 0}
+.modify .bt{font-weight:800;color:#b45309;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.modify ul{margin:.3em 0;padding-left:1.2em}.modify li{margin:.2em 0}
+
+.badge{display:inline-block;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;vertical-align:middle}
+.badge.model{background:var(--amber-l);color:#92400e;border:1px solid #f6d488}
+.badge.wifi{background:var(--cyan-l);color:#155e75}
+.badge.uno{background:var(--teal-l);color:#0f766e}
+.badge.theory{background:#e0e7ff;color:#3730a3}
+.badge.opt{background:#f3e8ff;color:#7e22ce;border:1px solid #e9d5ff}
+
+.project{border:1px solid var(--line);border-radius:16px;margin:22px 0;overflow:hidden;box-shadow:var(--shadow)}
+.project>.ph{background:linear-gradient(90deg,#fffaf0,#fff);border-bottom:1px solid var(--line);padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.project>.ph h4{margin:0;font-size:18px}
+.project>.pb{padding:6px 20px 20px}
+.pmeta{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.pmeta .t{font-size:12.5px;background:#eef0fb;color:#3c3a78;border-radius:8px;padding:4px 10px;font-weight:600}
+
+.code{background:var(--code-bg);border-radius:12px;margin:14px 0;overflow:hidden;border:1px solid #26243f}
+.code .ch{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#0f0e1f;color:#9d9ac0;font-size:12.5px;font-weight:700;border-bottom:1px solid #26243f}
+.code .ch .lang{color:#a78bfa;letter-spacing:.04em}
+.code pre{margin:0;padding:14px 16px;overflow-x:auto;counter-reset:ln}
+.code code{background:none;color:var(--code-ink);font-family:var(--mono);font-size:13.5px;line-height:1.6;padding:0;display:block}
+.code .line{display:block;white-space:pre;counter-increment:ln}
+.code .line::before{content:counter(ln);display:inline-block;width:2.2em;margin-right:1em;text-align:right;color:#4a476e;user-select:none}
+.cm{color:#7d7aa6} .kw{color:#a5f3d0} .fn{color:#93c5fd} .num{color:#fbbf77} .str{color:#f4a3bb} .pp{color:#c8a6ff}
+.code.py .ch .lang{color:#7dd3fc}
+
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--brand-soft);color:var(--brand-d);font-weight:700}
+tr:nth-child(even){background:#fafafe}
+td.fill{background:repeating-linear-gradient(-45deg,#fff,#fff 6px,#f4f5fa 6px,#f4f5fa 12px)}
+
+figure{margin:18px 0;text-align:center}
+figure svg{max-width:100%;height:auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px}
+figure img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+figcaption{color:var(--muted);font-size:13.5px;margin-top:8px}
+.wire{stroke-width:3.2;fill:none;stroke-linecap:round}
+.pin{font:600 11px var(--mono)} .lbl{font:600 13px var(--sans)} .lbl-s{font:600 11px var(--sans)}
+.wlbl{paint-order:stroke;stroke:#fff;stroke-width:3.4px;stroke-linejoin:round}
+
+.check li{list-style:none;margin:.35em 0;padding-left:30px;position:relative}
+.check li::before{content:"";position:absolute;left:0;top:3px;width:18px;height:18px;border:2px solid var(--brand);border-radius:5px}
+.check{padding-left:0}
+
+.toc{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px 28px;margin:26px auto}
+.toc h2{font-size:20px;margin:0 0 12px}
+.toc a{text-decoration:none;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line);font-size:13.5px;color:var(--muted)}
+.legend span{display:flex;align-items:center;gap:6px}
+
+.topbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:52px}
+.topbar b{color:var(--brand-d)}
+.topbar a{font-size:13.5px;text-decoration:none;color:var(--muted);font-weight:600;margin-left:14px}
+.topbar a:hover{color:var(--brand-d)}
+footer{color:var(--muted);font-size:13.5px;text-align:center;padding:34px 20px 60px}
+.kbd{font-family:var(--mono);background:#fff;border:1px solid #cbcfe0;border-bottom-width:2px;border-radius:6px;padding:1px 7px;font-size:.85em}
+.pill{display:inline-block;background:var(--cyan-l);color:#155e75;font-weight:700;font-size:12.5px;border-radius:8px;padding:2px 9px;margin:2px}
+@media(max-width:640px){.hero h1{font-size:27px}.part-body,.part-head{padding-left:18px;padding-right:18px}body{font-size:16px}}
+@media print{.topbar{display:none}.hero{background:#0e7490!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}section.part{box-shadow:none;border:1px solid #ccc;page-break-before:always}.code{border:1px solid #999}h3{page-break-after:avoid}table,figure,.code,.box{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap"><b>IoT 중급(대체) · WiFi · Arduino D1 R32</b>
+<nav><a href="#toc">목차</a><a href="#s1">통신 이론</a><a href="#s3">보드 세팅·유선</a><a href="#s5">WiFi</a><a href="#server">서버 업로드</a><a href="#s6">산출물</a><a href="#appendix">자료실</a></nav></div></div>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow">2026 IoT 캠프 · 주제 2 · 대체 버전</span>
+  <h1>사물인터넷 중급 (대체 버전)<br>WiFi 데이터 수집 · Arduino D1 R32</h1>
+  <p class="sub">통신의 원리를 이해하고, <b>Arduino D1 R32(ESP32) 하나로</b> 유선(시리얼) 수집·시각화부터 <b>WiFi 무선</b>까지 진행해 나만의 IoT 장치를 구현한다.</p>
+  <div class="meta">
+    <div class="chip"><span>대상</span><b>고등학생</b></div>
+    <div class="chip"><span>시간</span><b>6차시 (6시간 × 1일)</b></div>
+    <div class="chip"><span>보드</span><b>Arduino D1 R32 (ESP32) — 유선 시리얼 + WiFi 무선</b></div>
+    <div class="chip"><span>산출물</span><b>나만의 IoT 장치 구현</b></div>
+  </div>
+</div></header>
+
+<main class="wrap">
+
+<div class="box tip" style="max-width:940px;margin:22px auto 0"><div class="bt">🔀 이 교재는 “대체(WiFi) 버전”입니다</div>
+기본 중급 교재는 <b>XIAO nRF52840 + BLE(블루투스)</b>로 무선을 구성합니다. 이 문서는 <b>Arduino D1 R32(ESP32) 한 보드로</b> 유선 시리얼과 WiFi 무선을 모두 진행하는 대체 버전입니다. <b>보드 세팅을 3차시에서 먼저 하고, 시리얼 실습도 D1 R32로</b> 하며, 5차시 WiFi는 같은 보드를 그대로 씁니다. (통신 이론·산출물은 기본 교재와 동일)</div>
+
+<div class="toc" id="toc">
+  <h2>수업 개요 · 차시 계획</h2>
+  <p style="color:var(--muted);margin-top:0"><b>통신의 원리</b>를 이론으로 다진 뒤(1~2차시), <b>D1 R32 보드를 세팅하고 유선 시리얼</b>로 데이터를 수집·시각화하고(3~4차시), 같은 보드로 <b>WiFi 무선</b>까지 확장한 다음(5차시), <b>나만의 IoT 장치</b>를 구현합니다(6차시). 이후 <b>심화</b>로 값을 <b>서버에 올려 누적</b>하는 데 도전합니다. 제출용 <b>보고서 서식</b>은 <b>별도 파일</b>(<code>중급_대체_보고서_제출서식.html</code>)로 배포됩니다.</p>
+  <table>
+    <tr><th style="width:64px">차시</th><th>주제</th><th>핵심 활동</th></tr>
+    <tr><td>1</td><td><a href="#s1">통신이란? — 데이터가 오가는 원리 <span class="badge theory">이론</span></a></td><td>신호·비트·바이트 · 직렬/병렬 · UART 프레임</td></tr>
+    <tr><td>2</td><td><a href="#s2">통신 프로토콜과 유선·무선·네트워크 <span class="badge theory">이론</span></a></td><td>UART·I2C·SPI · 무선 비교 · WiFi·TCP/IP</td></tr>
+    <tr><td>3</td><td><a href="#s3">D1 R32 세팅 &amp; 유선 시리얼 통신 <span class="badge wifi">D1 R32</span></a></td><td>ESP32 보드 세팅 · 시리얼 전송 · 데이터 형식</td></tr>
+    <tr><td>4</td><td><a href="#s4">Python으로 수집·저장·시각화 <span class="badge wifi">D1 R32</span></a></td><td>pyserial · matplotlib · CSV <span class="badge model">예제 #1</span></td></tr>
+    <tr><td>5</td><td><a href="#s5">WiFi 무선 통신 &amp; 확장 <span class="badge opt">확장</span></a></td><td>WiFi 연결 · TCP 소켓 <span class="badge model">예제 #2·#3</span></td></tr>
+    <tr><td>6</td><td><a href="#s6">산출물 — 나만의 IoT 장치 구현</a></td><td>설계 · 구현 · 시연 · 발표</td></tr>
+    <tr><td>심화</td><td><a href="#server">센서 데이터를 서버에 올리기 <span class="badge opt">확장</span></a></td><td>HTTP POST · API 키 · 원격 대시보드 누적(집에서 도전)</td></tr>
+    <tr><td>서식</td><td>보고서 — 활동 계획서 &amp; 수강 보고서 <span class="badge opt">별도 파일</span></td><td>공식 제출 양식(별도 배포: <code>중급_대체_보고서_제출서식.html</code>)</td></tr>
+  </table>
+  <div class="legend">
+    <span>🎯 학습목표</span><span>💡 개념</span><span><span class="badge theory">이론</span></span>
+    <span>⚙️ 세팅</span><span>🧪 실습</span><span>🛠 <b style="color:#b45309">모델링 예제</b></span><span><span class="badge opt">확장</span></span><span>🔎 심화</span>
+  </div>
+</div>
+
+<div class="box parts"><div class="bt">🧰 준비물</div>
+<ul>
+<li><b>보드</b> : <b>Arduino D1 R32</b>(ESP32 기반, WiFi 내장, UNO 폼팩터), micro-USB 케이블 — 유선·무선 실습 모두 이 한 보드로 진행</li>
+<li><b>네트워크</b> : 노트북과 보드를 <b>같은 WiFi 공유기</b>에 연결(캠프용 공유기 SSID·비밀번호) — WiFi(5차시)에 필요</li>
+<li><b>센서/부품</b> : <b>조도센서 모듈</b>(저항 내장, 핀 <code>VCC·GND·D0·A0</code>), 점퍼선 (저항 별도 불필요)</li>
+<li><b>PC 소프트웨어</b> : Arduino IDE(+ESP32 보드 패키지), Python 3 + <span class="pill">pyserial</span><span class="pill">matplotlib</span><span class="pill">pandas</span> (WiFi 수신은 표준 <span class="pill">socket</span> 모듈)</li>
+</ul>
+</div>
+
+<!-- ============ 차시 1 : 이론 ① ============ -->
+<section class="part" id="s1">
+  <div class="part-head"><div class="ses">1차시 · 이론 ①</div>
+    <h2>통신이란? — 데이터가 오가는 원리 <span class="badge theory">이론</span></h2>
+    <div class="goalline">데이터가 전기 신호로 어떻게 표현되고 전달되는지, 통신의 기본 원리를 이해한다.</div>
+  </div>
+  <div class="part-body">
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li>통신의 3요소(송신자·수신자·매체)와 프로토콜(약속)의 개념을 설명할 수 있다.</li>
+  <li>데이터가 비트·바이트로 표현되고, 문자가 ASCII로 숫자화됨을 안다.</li>
+  <li>직렬/병렬, 동기/비동기 통신의 차이와 UART 프레임 구조를 이해한다.</li>
+  </ul></div>
+
+  <h3><span class="num">1-1</span>통신의 3요소와 프로토콜</h3>
+  <p><b>통신(communication)</b>은 <b>보내는 쪽(송신자)</b>이 <b>매체(전선·전파)</b>를 통해 <b>받는 쪽(수신자)</b>에게 정보를 전달하는 것입니다. 서로 올바르게 주고받으려면 “어떤 속도로, 어떤 순서로, 어떤 형식으로 보낼지”를 미리 약속해야 하는데, 이 약속을 <b>프로토콜(protocol)</b>이라고 합니다.</p>
+  <figure>
+  <svg viewBox="0 0 700 150" role="img" aria-label="통신의 3요소">
+    <defs><marker id="c1" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4f46e5"/></marker></defs>
+    <rect x="30" y="50" width="170" height="60" rx="12" fill="#f2f2ff" stroke="#4f46e5" stroke-width="2"/>
+    <rect x="500" y="50" width="170" height="60" rx="12" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <line x1="200" y1="80" x2="500" y2="80" class="wire" stroke="#4f46e5" marker-end="url(#c1)"/>
+    <text x="115" y="78" text-anchor="middle" class="lbl" fill="#4338ca">송신자</text>
+    <text x="115" y="98" text-anchor="middle" class="lbl-s" fill="#5f6478">아두이노(센서)</text>
+    <text x="585" y="78" text-anchor="middle" class="lbl" fill="#075985">수신자</text>
+    <text x="585" y="98" text-anchor="middle" class="lbl-s" fill="#5f6478">PC(파이썬)</text>
+    <text x="350" y="64" text-anchor="middle" class="lbl-s wlbl" fill="#4338ca">매체(전선·전파)</text>
+    <text x="350" y="100" text-anchor="middle" class="lbl-s wlbl" fill="#5f6478">프로토콜(속도·형식·순서 약속)</text>
+  </svg>
+  <figcaption>같은 프로토콜을 써야 서로 이해할 수 있다 — 속도·형식이 다르면 글자가 깨진다</figcaption>
+  </figure>
+
+  <h3><span class="num">1-2</span>데이터를 신호로 — 비트와 바이트</h3>
+  <p>컴퓨터와 아두이노는 세상을 <b>0과 1</b>(전압 LOW/HIGH)로 다룹니다. 0 또는 1 하나가 <b>비트(bit)</b>이고, 비트 8개가 <b>바이트(byte)</b>입니다. 1바이트로는 0~255(2<sup>8</sup>=256가지)를 표현합니다.</p>
+  <table>
+    <tr><th style="width:150px">단위</th><th>크기</th><th>표현 범위</th></tr>
+    <tr><td>비트 (bit)</td><td>0 또는 1</td><td>2가지</td></tr>
+    <tr><td>바이트 (byte)</td><td>8비트</td><td>0 ~ 255</td></tr>
+    <tr><td>정수 (int, ESP32)</td><td>4바이트(32비트)</td><td>약 −21억 ~ 21억</td></tr>
+  </table>
+  <div class="box concept"><div class="bt">💡 문자는 어떻게 보낼까? — ASCII</div>
+  숫자만 오가는 통신에서 <b>문자</b>를 보내려면 문자마다 정해진 번호를 씁니다. 이 약속이 <b>ASCII 코드</b>입니다. 예: <code>'A'</code>=65, <code>'a'</code>=97, <code>'0'</code>(문자 0)=48. 전체 표는 <a href="#appendixD">부록 D</a>.</div>
+
+  <h3><span class="num">1-3</span>직렬 통신 vs 병렬 통신</h3>
+  <p><b>병렬(parallel)</b>은 여러 선으로 <b>동시에</b> 보내 빠르지만 선이 많이 필요합니다. <b>직렬(serial)</b>은 <b>한 선으로 한 비트씩 차례대로</b> 보내 느리지만 간단합니다. 아두이노–PC 통신, 대부분의 센서 통신은 <b>직렬</b>을 씁니다.</p>
+  <table>
+    <tr><th style="width:120px">구분</th><th>직렬(Serial)</th><th>병렬(Parallel)</th></tr>
+    <tr><td>전송 방식</td><td>한 선으로 한 비트씩</td><td>여러 선으로 동시에</td></tr>
+    <tr><td>선의 수</td><td>적음(1~2개)</td><td>많음(8개+)</td></tr>
+    <tr><td>거리·비용</td><td>길게·싸게 가능</td><td>짧고 비쌈</td></tr>
+    <tr><td>예</td><td>USB, 시리얼(UART), I2C, SPI</td><td>옛 프린터 포트, 내부 버스</td></tr>
+  </table>
+
+  <h3><span class="num">1-4</span>동기 vs 비동기 · UART 프레임</h3>
+  <p>직렬 통신은 “언제가 한 비트인지” 타이밍을 맞춰야 합니다. <b>동기식</b>은 <b>클럭(clock)</b> 선으로 박자를 함께 보내고(I2C·SPI), <b>비동기식</b>은 클럭 없이 <b>미리 약속한 속도</b>로 맞춥니다. 아두이노의 <b>UART 시리얼</b>이 비동기식이며, 약속한 속도가 <b>보드레이트(baud rate)</b>입니다. <code>9600</code>이면 초당 약 9600비트입니다.</p>
+  <figure>
+  <svg viewBox="0 0 720 150" role="img" aria-label="UART 프레임 구조">
+    <rect x="20" y="45" width="90" height="42" rx="6" fill="#eef0f5" stroke="#94a3b8"/>
+    <rect x="112" y="45" width="70" height="42" rx="6" fill="#dcfce7" stroke="#16a34a"/>
+    <g fill="#e0e7ff" stroke="#6366f1">
+      <rect x="184" y="45" width="47" height="42" rx="5"/><rect x="233" y="45" width="47" height="42" rx="5"/>
+      <rect x="282" y="45" width="47" height="42" rx="5"/><rect x="331" y="45" width="47" height="42" rx="5"/>
+      <rect x="380" y="45" width="47" height="42" rx="5"/><rect x="429" y="45" width="47" height="42" rx="5"/>
+      <rect x="478" y="45" width="47" height="42" rx="5"/><rect x="527" y="45" width="47" height="42" rx="5"/></g>
+    <rect x="576" y="45" width="80" height="42" rx="6" fill="#eef0f5" stroke="#94a3b8"/>
+    <text x="65" y="71" text-anchor="middle" class="lbl-s" fill="#475569">유휴(HIGH)</text>
+    <text x="147" y="71" text-anchor="middle" class="lbl-s" fill="#15803d">시작비트</text>
+    <g class="pin" fill="#4338ca" text-anchor="middle">
+      <text x="207" y="70">D0</text><text x="256" y="70">D1</text><text x="305" y="70">D2</text><text x="354" y="70">D3</text>
+      <text x="403" y="70">D4</text><text x="452" y="70">D5</text><text x="501" y="70">D6</text><text x="550" y="70">D7</text></g>
+    <text x="616" y="71" text-anchor="middle" class="lbl-s" fill="#475569">정지비트</text>
+    <text x="380" y="30" text-anchor="middle" class="lbl" fill="#1b1f33">UART 1바이트 프레임</text>
+    <text x="380" y="110" text-anchor="middle" class="lbl-s" fill="#5f6478">시작비트(LOW)로 “간다!” 알리고 → 데이터 8비트 → 정지비트(HIGH)로 “끝!”</text>
+    <text x="380" y="128" text-anchor="middle" class="lbl-s" fill="#5f6478">데이터는 보통 낮은 자리(D0)부터 · 속도는 baud로 약속</text>
+  </svg>
+  <figcaption>비동기 UART: 시작·정지 비트로 한 바이트의 경계를 표시한다</figcaption>
+  </figure>
+  <div class="box tip"><div class="bt">💡 baud가 안 맞으면?</div>
+  송신·수신의 보드레이트가 다르면 <b>글자가 깨져(□©◊…)</b> 보입니다. 아두이노 <code>Serial.begin(...)</code>과 모니터/파이썬 속도를 <b>반드시 같게</b> 맞추세요. (UNO는 보통 9600, ESP32(D1 R32)는 115200을 씁니다.)</div>
+
+  <div class="box mission"><div class="bt">🎮 생각해 보기</div>
+  ① <code>Serial.println(255)</code>는 몇 바이트(문자)로 전송될까? ② 문자 <code>'7'</code>과 숫자 <code>7</code>은 통신에서 같은 값일까?</div>
+  </div>
+</section>
+
+<!-- ============ 차시 2 : 이론 ② ============ -->
+<section class="part" id="s2">
+  <div class="part-head"><div class="ses">2차시 · 이론 ②</div>
+    <h2>통신 프로토콜과 유선·무선·네트워크 <span class="badge theory">이론</span></h2>
+    <div class="goalline">UART·I2C·SPI와 무선 기술을 비교하고, WiFi·TCP/IP로 데이터를 주고받는 원리를 이해한다.</div>
+  </div>
+  <div class="part-body">
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li>UART·I2C·SPI의 특징과 “언제 쓰는지”를 구분할 수 있다.</li>
+  <li>무선 기술(WiFi·BLE·Zigbee·LoRa·NFC)의 트레이드오프를 설명할 수 있다.</li>
+  <li>WiFi 네트워크에서 <b>IP 주소·포트·TCP 소켓·클라이언트/서버</b> 개념을 이해한다.</li>
+  </ul></div>
+
+  <h3><span class="num">2-1</span>아두이노의 3대 통신 프로토콜</h3>
+  <table>
+    <tr><th style="width:90px">방식</th><th>선(핀)</th><th>동기</th><th>특징</th><th>주로 쓰는 곳</th></tr>
+    <tr><td><b>UART</b><br>(시리얼)</td><td>TX, RX (+GND)</td><td>비동기</td><td>1:1, 간단, 보드레이트 약속</td><td>아두이노 ↔ PC(USB)</td></tr>
+    <tr><td><b>I2C</b></td><td>SDA, SCL (2선)</td><td>동기</td><td>한 버스에 <b>여러 센서</b>(주소로 구분)</td><td>온습도·조도·기압 등</td></tr>
+    <tr><td><b>SPI</b></td><td>MOSI, MISO, SCK, SS (4선)</td><td>동기</td><td>매우 빠름, 선 많음</td><td>디스플레이·SD카드</td></tr>
+  </table>
+
+  <h3><span class="num">2-2</span>무선 통신 기술 비교</h3>
+  <p><b>거리·속도·전력</b>은 서로 맞바꾸는 관계입니다. 이 대체 교재는 그중 <b>WiFi</b>를 사용합니다.</p>
+  <table>
+    <tr><th style="width:90px">기술</th><th>거리(대략)</th><th>속도</th><th>전력</th><th>대표 용도</th></tr>
+    <tr><td><b>WiFi</b></td><td>수십 m+</td><td><b>높음</b></td><td>높음</td><td>인터넷 연결, 영상·대용량 <span class="badge wifi">이 교재</span></td></tr>
+    <tr><td>BLE</td><td>~10 m</td><td>낮음</td><td>매우 낮음</td><td>웨어러블·센서(기본 교재)</td></tr>
+    <tr><td>Zigbee</td><td>~10–100 m</td><td>낮음</td><td>낮음</td><td>스마트홈 메시</td></tr>
+    <tr><td>LoRa</td><td><b>수 km</b></td><td>매우 낮음</td><td>초저전력</td><td>광역·환경 센서</td></tr>
+    <tr><td>NFC</td><td>~수 cm</td><td>낮음</td><td>낮음</td><td>태그·결제</td></tr>
+  </table>
+  <div class="box concept"><div class="bt">💡 WiFi를 쓰면 좋은 경우</div>
+  데이터를 <b>인터넷/네트워크</b>로 보내거나, <b>PC·서버·웹</b>과 직접 통신하거나, 전송량이 많을 때 유리합니다. 대신 전력 소모가 커서 배터리 장시간 구동에는 불리합니다. D1 R32는 WiFi가 내장돼 있어 별도 모듈 없이 무선 통신이 가능합니다.</div>
+
+  <h3><span class="num">2-3</span>WiFi와 네트워크 기초 — IP·포트·TCP</h3>
+  <p>WiFi로 통신하려면 두 장치가 <b>같은 공유기(네트워크)</b>에 연결되어야 합니다. 네트워크에 연결되면 각 장치는 <b>IP 주소</b>(예: <code>192.168.0.10</code>)를 받습니다. 한 장치 안에서도 프로그램마다 창구를 구분하는 <b>포트(port)</b> 번호(예: <code>5000</code>)를 씁니다.</p>
+  <figure>
+  <svg viewBox="0 0 700 220" role="img" aria-label="WiFi 네트워크 구조">
+    <!-- 도형(뒤) -->
+    <rect x="285" y="20" width="130" height="52" rx="12" fill="#ecfeff" stroke="#0e7490" stroke-width="2"/>
+    <rect x="40" y="150" width="200" height="60" rx="12" fill="#ecfeff" stroke="#0e7490" stroke-width="2"/>
+    <rect x="460" y="150" width="200" height="60" rx="12" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <!-- 선(뒤) -->
+    <path class="wire" stroke="#0e7490" stroke-dasharray="7 6" d="M320,72 L160,150"/>
+    <path class="wire" stroke="#0e7490" stroke-dasharray="7 6" d="M380,72 L540,150"/>
+    <!-- 글자(앞) -->
+    <text x="350" y="43" text-anchor="middle" class="lbl" fill="#0e7490">WiFi 공유기</text>
+    <text x="350" y="61" text-anchor="middle" class="lbl-s" fill="#5f6478">(같은 네트워크)</text>
+    <text x="140" y="176" text-anchor="middle" class="lbl" fill="#0e7490">D1 R32 (서버)</text>
+    <text x="140" y="196" text-anchor="middle" class="lbl-s" fill="#5f6478">IP 192.168.0.10 : 5000</text>
+    <text x="560" y="176" text-anchor="middle" class="lbl" fill="#075985">PC · Python (클라이언트)</text>
+    <text x="560" y="196" text-anchor="middle" class="lbl-s" fill="#5f6478">그 IP:포트로 접속</text>
+    <text x="235" y="105" text-anchor="middle" class="lbl-s wlbl" fill="#0e7490">WiFi</text>
+    <text x="470" y="105" text-anchor="middle" class="lbl-s wlbl" fill="#0e7490">WiFi</text>
+  </svg>
+  <figcaption>둘 다 같은 공유기에 연결 → D1 R32가 받은 IP:포트로 PC가 접속해 데이터를 받는다</figcaption>
+  </figure>
+  <div class="box concept"><div class="bt">💡 TCP 소켓 · 클라이언트–서버</div>
+  <ul>
+  <li><b>TCP</b> : 데이터를 <b>순서대로·빠짐없이</b> 전달하도록 보장하는 신뢰성 있는 연결형 통신.</li>
+  <li><b>소켓(socket)</b> : 두 프로그램이 데이터를 주고받는 “통신 창구(끝점)”.</li>
+  <li><b>서버(server)</b> : 연결을 <b>기다리는</b> 쪽 — 여기선 <b>D1 R32</b>(포트 5000을 엶).</li>
+  <li><b>클라이언트(client)</b> : 먼저 <b>접속하는</b> 쪽 — 여기선 <b>PC의 파이썬</b>.</li>
+  </ul></div>
+  <div class="box mission"><div class="bt">🎮 정리 퀴즈</div>
+  ① 두 장치가 WiFi로 통신하려면 무엇이 같아야 할까? ② IP 주소와 포트의 차이는? ③ D1 R32와 PC 중 누가 서버이고 누가 클라이언트일까?</div>
+  </div>
+</section>
+
+<!-- ============ 차시 3 : UNO 유선 시리얼 (핵심) ============ -->
+<section class="part" id="s3">
+  <div class="part-head"><div class="ses">3차시 · 핵심 실습</div>
+    <h2>D1 R32 세팅 &amp; 유선 시리얼 통신 <span class="badge wifi">D1 R32</span></h2>
+    <div class="goalline">Arduino D1 R32(ESP32)를 IDE에 세팅하고, 센서 값을 시리얼로 PC에 전송하며 데이터 형식을 설계한다.</div>
+  </div>
+  <div class="part-body">
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li>Arduino D1 R32(ESP32)를 IDE에 세팅하고 포트·보드레이트(115200)를 맞출 수 있다.</li>
+  <li>센서 값을 일정 주기로 시리얼로 전송하고 모니터·플로터로 확인할 수 있다.</li>
+  <li>여러 값을 <b>한 줄(CSV 형식)</b>로 보내는 데이터 형식을 설계할 수 있다.</li>
+  </ul></div>
+
+  <h3><span class="num">3-1</span>데이터 수집의 전체 흐름</h3>
+  <figure>
+  <svg viewBox="0 0 720 120" role="img" aria-label="데이터 수집 파이프라인">
+    <defs><marker id="a" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4f46e5"/></marker></defs>
+    <rect x="10" y="35" width="120" height="52" rx="10" fill="#f2f2ff" stroke="#4f46e5"/>
+    <rect x="152" y="35" width="120" height="52" rx="10" fill="#f2f2ff" stroke="#4f46e5"/>
+    <rect x="294" y="35" width="140" height="52" rx="10" fill="#ecfeff" stroke="#0e7490"/>
+    <rect x="456" y="35" width="120" height="52" rx="10" fill="#e0f2fe" stroke="#0284c7"/>
+    <rect x="598" y="35" width="112" height="52" rx="10" fill="#ccfbf1" stroke="#0d9488"/>
+    <g stroke="#4f46e5" class="wire">
+    <line x1="130" y1="61" x2="150" y2="61" marker-end="url(#a)"/><line x1="272" y1="61" x2="292" y2="61" marker-end="url(#a)"/>
+    <line x1="434" y1="61" x2="454" y2="61" marker-end="url(#a)"/><line x1="576" y1="61" x2="596" y2="61" marker-end="url(#a)"/></g>
+    <g text-anchor="middle" class="lbl-s">
+    <text x="70" y="58" fill="#4338ca">센서</text><text x="70" y="75" fill="#5f6478">측정</text>
+    <text x="212" y="58" fill="#4338ca">보드</text><text x="212" y="75" fill="#5f6478">읽고 전송</text>
+    <text x="364" y="58" fill="#0e7490">통신</text><text x="364" y="75" fill="#5f6478">유선/WiFi</text>
+    <text x="516" y="58" fill="#075985">PC 수집</text><text x="516" y="75" fill="#5f6478">Python</text>
+    <text x="654" y="58" fill="#0f766e">저장·시각화</text><text x="654" y="75" fill="#5f6478">CSV·그래프</text>
+    </g>
+  </svg>
+  </figure>
+
+  <h3><span class="num">3-2</span>⚙️ Arduino D1 R32(ESP32) 세팅 — 제일 먼저!</h3>
+  <p>이 교재는 <b>D1 R32 한 보드</b>로 유선(시리얼)과 무선(WiFi)을 모두 합니다. 먼저 ESP32 보드 패키지를 설치합니다.</p>
+  <div class="box setup"><div class="bt">⚙️ 1단계 — ESP32 보드 패키지 설치</div>
+  <ol>
+  <li><span class="kbd">파일</span> → <span class="kbd">환경설정</span> → <b>추가 보드 매니저 URLs</b>에 추가:<br>
+  <code>https://espressif.github.io/arduino-esp32/package_esp32_index.json</code></li>
+  <li><span class="kbd">도구</span> → <span class="kbd">보드</span> → <span class="kbd">보드 매니저</span>에서 <b>“esp32”</b>(by Espressif Systems) 설치.</li>
+  <li><span class="kbd">도구</span> → <span class="kbd">보드</span> → <span class="kbd">ESP32 Arduino</span> → <b>WEMOS D1 R32</b> 선택. <span style="color:var(--muted)">(목록에 없으면 “ESP32 Dev Module”로도 동작)</span></li>
+  </ol></div>
+  <div class="box setup"><div class="bt">⚙️ 2단계 — 연결·포트</div>
+  <ol>
+  <li>micro-USB로 D1 R32를 PC에 연결. USB 칩이 <b>CH340</b>이면 CH340 드라이버 설치.<br>
+  📥 <b>CH340 드라이버 내려받기</b> : <a href="https://drive.google.com/file/d/17GAGCZnYkOyQc92wh4aKSmaQRpLW8LdX/view?usp=sharing" target="_blank" rel="noopener">Google Drive 링크</a></li>
+  <li><span class="kbd">도구</span> → <span class="kbd">포트</span>에서 새로 생긴 <b>COM 포트</b>를 선택한다.</li>
+  <li><span class="kbd">도구</span> → <span class="kbd">Upload Speed</span>를 <b>115200</b>으로 설정한다. <span class="mut">(기본값 921600은 일부 보드·케이블에서 업로드가 실패합니다)</span></li>
+  <li>업로드가 안 되면 보드의 <b>BOOT 버튼을 누른 채</b> 업로드해 본다(일부 보드).</li>
+  </ol></div>
+  <div class="box warn"><div class="bt">⚠️ 헷갈리기 쉬운 “두 가지 속도”</div>
+  이름이 비슷하지만 <b>다른 설정</b>입니다.
+  <ul>
+  <li><b>Upload Speed</b>(<span class="kbd">도구</span> 메뉴) = 스케치를 <b>업로드할 때</b> 속도 → <b>115200</b> 권장. <b>안 맞으면 업로드 자체가 실패</b>합니다.</li>
+  <li><b>Serial 통신 속도</b>(코드의 <code>Serial.begin(115200)</code> = 시리얼 모니터 속도) = 값을 <b>주고받을 때</b> 속도 → 모니터도 <b>115200</b>. 안 맞으면 <b>글자가 깨져</b> 보입니다.</li>
+  </ul></div>
+  <div class="box warn"><div class="bt">⚠️ 3.3V 로직 · 12비트 ADC</div>ESP32 핀은 <b>3.3V</b> 기준입니다. 센서 전원은 <b>3V3</b>에서 뽑고 아날로그 입력에 3.3V를 넘기지 않습니다. ADC는 <b>12비트(0~4095)</b>라 코드에서 <code>analogReadResolution(12)</code>를 씁니다.</div>
+
+  <h4>📌 D1 R32 핀맵 (참고)</h4>
+  <p>배선 전에 핀 위치를 확인하세요. 이 실습에서 쓰는 핀은 <b>3V3</b>(전원)·<b>GND</b>(접지)·<b>IO34</b>(아날로그 입력)입니다.</p>
+  <figure>
+    <img src="media/d1r32_pinout.png" alt="Arduino D1 R32 (ESP32) 보드 핀아웃" style="max-width:780px">
+    <figcaption>D1 R32(ESP32) 핀아웃 — 왼쪽 <b>ANALOG</b> 영역의 <b>IO34</b>(파란색 = 12비트 아날로그 입력, ADC1-6), 전원 <b>3V3/5V/GND</b>, 오른쪽 <b>DIGITAL·SPI·I2C(SCL·SDA)</b>. <span style="color:var(--muted)">(출처: D1 R32 Board Pinout)</span></figcaption>
+  </figure>
+
+  <h3><span class="num">3-3</span>🧪 실습 — 조도 값을 PC로 보내기</h3>
+  <p>조도센서 <b>모듈</b>(저항 내장, 핀 4개 <code>VCC·GND·D0·A0</code>)을 연결합니다. <b>VCC→3V3, GND→GND, A0→IO34</b>로 잇고, <b>D0</b>는 쓰지 않습니다. (모듈에 저항이 들어 있어 <b>별도 1kΩ이 필요 없습니다</b>.)</p>
+  <figure>
+  <svg viewBox="0 0 620 170" role="img" aria-label="D1 R32 + 조도센서 모듈 배선">
+    <!-- 도형(뒤) -->
+    <rect x="30" y="45" width="140" height="90" rx="12" fill="#0e7490"/>
+    <rect x="420" y="40" width="170" height="98" rx="12" fill="#fffbe8" stroke="#ca8a04" stroke-width="2"/>
+    <circle cx="505" cy="112" r="10" fill="#fde68a" stroke="#ca8a04"/>
+    <!-- 선(항상 뒤) -->
+    <line x1="170" y1="60" x2="420" y2="60" class="wire" stroke="#e11d48"/>
+    <line x1="170" y1="86" x2="420" y2="86" class="wire" stroke="#0284c7"/>
+    <line x1="170" y1="118" x2="420" y2="118" class="wire" stroke="#334155"/>
+    <!-- 글자(항상 앞) -->
+    <text x="100" y="95" text-anchor="middle" class="lbl" fill="#fff">D1 R32</text>
+    <text x="505" y="68" text-anchor="middle" class="lbl-s" fill="#854d0e">조도센서 모듈</text>
+    <text x="505" y="84" text-anchor="middle" class="lbl-s" fill="#a16207">(저항 내장)</text>
+    <g class="pin wlbl" fill="#334155">
+      <text x="196" y="52">VCC → 3V3</text>
+      <text x="196" y="78">A0 → IO34</text>
+      <text x="196" y="110">GND → GND</text>
+      <text x="196" y="134" fill="#9aa3b2">D0 → 사용 안 함</text>
+    </g>
+  </svg>
+  <figcaption>모듈 <b>VCC→3V3 · GND→GND · A0→IO34</b> (D0 미사용) · 저항 내장이라 1kΩ 불필요</figcaption>
+  </figure>
+  <div class="code"><div class="ch"><span class="lang">Arduino(D1 R32) · 실습코드 #01</span><span>조도 값 시리얼 전송</span></div>
+<pre><code><span class="line"><span class="kw">void</span> <span class="fn">setup</span>() {</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">begin</span>(<span class="num">115200</span>);</span><span class="line">  <span class="fn">analogReadResolution</span>(<span class="num">12</span>);   <span class="cm">// ESP32 ADC 12비트(0~4095)</span></span><span class="line">}</span><span class="line"><span class="kw">void</span> <span class="fn">loop</span>() {</span><span class="line">  <span class="kw">int</span> light = <span class="fn">analogRead</span>(<span class="num">34</span>); <span class="cm">// 조도센서(IO34)</span></span><span class="line">  <span class="fn">Serial</span>.<span class="fn">println</span>(light);      <span class="cm">// 값 + 줄바꿈</span></span><span class="line">  <span class="fn">delay</span>(<span class="num">500</span>);</span><span class="line">}</span></code></pre></div>
+  <div class="box concept"><div class="bt">💡 왜 0~4095일까? — ADC와 12비트</div>
+  <b>ADC(아날로그-디지털 변환기)</b>는 센서의 연속 전압(0~3.3V)을 디지털 <b>숫자</b>로 바꾸는 장치입니다. 이때 전압 범위를 몇 단계로 나눌지가 <b>해상도(비트 수)</b>입니다.
+  <ul>
+  <li><b>n비트 ADC</b>는 2<sup>n</sup>단계로 나눕니다.</li>
+  <li>ESP32(D1 R32)는 <b>12비트</b> → 2<sup>12</sup> = <b>4096</b>단계 → 값 범위 <b>0 ~ 4095</b>.</li>
+  <li>참고로 아두이노 UNO는 <b>10비트</b>(2<sup>10</sup>=1024 → 0~1023)라 더 거칩니다. 비트가 클수록 같은 전압을 <b>더 촘촘히</b> 구분합니다.</li>
+  </ul>
+  <code>analogReadResolution(12)</code>는 읽기 해상도를 <b>12비트</b>로 정하는 것입니다(ESP32 기본값도 12비트라 명시해 두는 셈). 값을 실제 전압으로 바꾸려면 <b>전압 = 값 ÷ 4095 × 3.3V</b>로 계산합니다 — 예: 값 <code>2048</code> ≈ <b>1.65V</b>(절반).
+  <div style="margin-top:6px;color:var(--muted);font-size:14px">※ ESP32 ADC는 완전한 선형이 아니라, 정밀 측정에는 약간의 오차·보정이 있을 수 있습니다.</div></div>
+  <div class="box tip"><div class="bt">💡 시리얼 모니터 vs 플로터</div>
+  <span class="kbd">도구 → 시리얼 모니터</span>는 숫자를, <span class="kbd">도구 → 시리얼 플로터</span>는 값을 <b>그래프</b>로 보여 줍니다.</div>
+
+  <h3><span class="num">3-4</span>🔎 심화 — 여러 값을 한 줄로 (CSV 형식)</h3>
+  <p>여러 센서 값을 <b>쉼표</b>로 이어 한 줄로 보내면 PC가 나누기 쉽습니다. 이것이 <b>CSV</b> 형식입니다.</p>
+  <div class="code"><div class="ch"><span class="lang">Arduino(D1 R32) · 실습코드 #01+</span><span>두 값(IO34·IO39)을 CSV로</span></div>
+<pre><code><span class="line"><span class="kw">void</span> <span class="fn">setup</span>() {</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">begin</span>(<span class="num">115200</span>);</span><span class="line">  <span class="fn">analogReadResolution</span>(<span class="num">12</span>);</span><span class="line">}</span><span class="line"><span class="kw">void</span> <span class="fn">loop</span>() {</span><span class="line">  <span class="kw">int</span> light  = <span class="fn">analogRead</span>(<span class="num">34</span>); <span class="cm">// 조도센서(IO34)</span></span><span class="line">  <span class="kw">int</span> light2 = <span class="fn">analogRead</span>(<span class="num">39</span>); <span class="cm">// 두 번째 센서(IO39)</span></span><span class="line">  <span class="fn">Serial</span>.<span class="fn">print</span>(light);</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">print</span>(<span class="str">","</span>);          <span class="cm">// 구분자</span></span><span class="line">  <span class="fn">Serial</span>.<span class="fn">println</span>(light2);     <span class="cm">// 줄바꿈</span></span><span class="line">  <span class="fn">delay</span>(<span class="num">500</span>);</span><span class="line">}</span></code></pre></div>
+  <div class="box mission"><div class="bt">🎮 미션</div><code>delay</code>로 주기를 바꿔 보고, 값 앞에 <code>Serial.print("light,")</code>로 이름표를 붙여 보기.</div>
+  </div>
+</section>
+
+<!-- ============ 차시 4 : Python 수집 (핵심) ============ -->
+<section class="part" id="s4">
+  <div class="part-head"><div class="ses">4차시 · 핵심 실습</div>
+    <h2>Python으로 데이터 수집·저장·시각화 <span class="badge wifi">D1 R32</span></h2>
+    <div class="goalline">시리얼 데이터를 파이썬으로 읽어 그래프로 그리고 CSV로 저장한다.</div>
+  </div>
+  <div class="part-body">
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li><code>pyserial</code>로 아두이노가 보낸 값을 PC에서 읽을 수 있다.</li>
+  <li><code>matplotlib</code>으로 그래프를, <code>pandas</code>로 CSV 저장을 할 수 있다.</li>
+  <li>수집 개수·주기 등 파라미터를 바꿔 나만의 로거를 만들 수 있다.</li>
+  </ul></div>
+
+  <div class="box warn"><div class="bt">📦 먼저! 파이썬 라이브러리 설치 (코드 실행 전 필수)</div>
+  아래 파이썬 실습들은 <b>추가 라이브러리</b>가 필요합니다. 코드를 실행하기 <b>전에</b> 터미널(명령 프롬프트)에서 <b>한 번만</b> 설치하세요.
+  <div class="code"><div class="ch"><span class="lang">터미널(명령 프롬프트)</span><span>실행 전 1회 설치</span></div>
+<pre><code><span class="line">pip install pyserial pandas matplotlib</span></code></pre></div>
+  <ul>
+  <li>⚠️ 시리얼 통신 패키지는 <b>pyserial</b> 입니다. <b><code>pip install serial</code> 은 다른(잘못된) 패키지</b>라서, 실행하면 <code>module 'serial' has no attribute 'Serial'</code> 오류가 납니다.</li>
+  <li>설치할 이름은 <code>pyserial</code>, 코드에서 쓰는 것은 <code>import serial</code> — 이름이 달라도 <b>정상</b>입니다.</li>
+  <li>이미 <code>pip install serial</code>을 했다면: <code>pip uninstall -y serial</code> 로 지우고 <code>pip install pyserial</code> 로 다시 설치하세요.</li>
+  <li>확인: <code>python -c "import serial; print(serial.__version__)"</code> → 버전 숫자가 뜨면 성공.</li>
+  </ul></div>
+  <h3><span class="num">4-1</span>파이썬으로 값 읽기</h3>
+  <p>아두이노 IDE의 시리얼 모니터는 <b>닫아 두어야</b> 파이썬이 포트를 쓸 수 있습니다.</p>
+  <div class="code py"><div class="ch"><span class="lang">Python · 실습코드 #01</span><span>시리얼 값 읽기</span></div>
+<pre><code><span class="line"><span class="kw">import</span> serial</span><span class="line">ser = serial.<span class="fn">Serial</span>(<span class="str">'COM3'</span>, <span class="num">115200</span>) <span class="cm"># 포트·속도는 아두이노와 동일(ESP32=115200)</span></span><span class="line"><span class="kw">while</span> <span class="kw">True</span>:</span><span class="line">    line = ser.<span class="fn">readline</span>().<span class="fn">decode</span>().<span class="fn">strip</span>()</span><span class="line">    <span class="kw">if</span> line.<span class="fn">isdigit</span>():</span><span class="line">        <span class="fn">print</span>(<span class="fn">int</span>(line))</span></code></pre></div>
+  <div class="box warn"><div class="bt">⚠️ 포트 사용 충돌 — 한 번에 한 프로그램만!</div>
+  시리얼 포트(COM)는 <b>한 번에 한 프로그램만</b> 열 수 있습니다. 파이썬과 아두이노 <b>시리얼 모니터를 동시에 켜면 둘 다 오류로 종료</b>될 수 있어요. 반드시 번갈아 사용하세요.
+  <ul>
+  <li>파이썬 실행 <b>전</b> → 아두이노 <b>시리얼 모니터/플로터를 닫기</b>.</li>
+  <li>시리얼 모니터를 열기 <b>전</b> → 파이썬을 <b>완전히 종료</b>(실행 중이면 <span class="kbd">Ctrl+C</span> 또는 정지 버튼).</li>
+  <li>코드는 <code>with serial.Serial(...)</code>로 감싸 <b>끝나면 포트를 자동 반납</b>하게 합니다(아래 예제 적용).</li>
+  <li>그래도 둘 다 멈추면 → 보드 <b>USB를 뽑았다 다시 꽂아</b> 포트를 초기화하세요.</li>
+  </ul></div>
+
+  <h3><span class="num">4-2</span>실시간 그래프 + CSV 저장</h3>
+  <div class="project" id="model1">
+    <div class="ph"><h4>🛠 예제 #1 · 유선 데이터 로거 (D1 R32 → CSV·그래프)</h4><span class="badge model">수정 가능 예제 #1</span> <span class="badge wifi">D1 R32</span></div>
+    <div class="pb">
+    <div class="pmeta"><span class="t">입력: 조도 IO34</span><span class="t">통신: 시리얼(USB)</span><span class="t">저장: CSV(pandas)</span><span class="t">시각화: matplotlib</span></div>
+    <figure>
+    <svg viewBox="0 0 620 170" role="img" aria-label="유선 데이터 로거 회로 (D1 R32 + 조도센서 모듈)">
+      <rect x="30" y="45" width="140" height="90" rx="12" fill="#0e7490"/>
+      <rect x="420" y="40" width="170" height="98" rx="12" fill="#fffbe8" stroke="#ca8a04" stroke-width="2"/>
+      <circle cx="505" cy="112" r="10" fill="#fde68a" stroke="#ca8a04"/>
+      <line x1="170" y1="60" x2="420" y2="60" class="wire" stroke="#e11d48"/>
+      <line x1="170" y1="86" x2="420" y2="86" class="wire" stroke="#0284c7"/>
+      <line x1="170" y1="118" x2="420" y2="118" class="wire" stroke="#334155"/>
+      <text x="100" y="95" text-anchor="middle" class="lbl" fill="#fff">D1 R32</text>
+      <text x="505" y="68" text-anchor="middle" class="lbl-s" fill="#854d0e">조도센서 모듈</text>
+      <text x="505" y="84" text-anchor="middle" class="lbl-s" fill="#a16207">(저항 내장)</text>
+      <g class="pin wlbl" fill="#334155">
+        <text x="196" y="52">VCC → 3V3</text>
+        <text x="196" y="78">A0 → IO34</text>
+        <text x="196" y="110">GND → GND</text>
+        <text x="196" y="134" fill="#9aa3b2">D0 → 사용 안 함</text>
+      </g>
+    </svg>
+    <figcaption>조도센서 모듈 <b>VCC→3V3 · GND→GND · A0→IO34</b> (D0 미사용) · 값은 시리얼(USB)로 PC 전송</figcaption>
+    </figure>
+    <div class="box tip"><div class="bt">🔗 어떤 아두이노 코드와 짝인가</div>
+    이 로거는 <b>3차시 실습코드 #01</b>(<code>Serial.println(light)</code> — 값 <b>한 개</b>만 전송)과 짝입니다. 그래서 파이썬도 <code>line.isdigit()</code>로 값 <b>한 개</b>를 읽습니다. 만약 <b>실습코드 #01+</b>처럼 <code>조도,값2</code>를 CSV로 보낸다면, 파이썬에서 <code>line.split(',')</code>로 나눠 받아야 합니다.</div>
+    <div class="code py"><div class="ch"><span class="lang">Python · 모델링 예제 #1</span><span>유선 데이터 로거 (← 아두이노 실습코드 #01)</span></div>
+<pre><code><span class="line"><span class="kw">import</span> serial, datetime</span><span class="line"><span class="kw">import</span> pandas <span class="kw">as</span> pd</span><span class="line"><span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt</span><span class="line"></span><span class="line">PORT = <span class="str">'COM3'</span>      <span class="cm"># ← 내 포트로 수정</span></span><span class="line">DATA_LIMIT = <span class="num">100</span>    <span class="cm"># ← 모을 데이터 개수</span></span><span class="line">values, times = [], []</span><span class="line"></span><span class="line"><span class="kw">with</span> serial.<span class="fn">Serial</span>(PORT, <span class="num">115200</span>, timeout=<span class="num">1</span>) <span class="kw">as</span> ser:  <span class="cm"># with: 끝나면 포트를 자동 반납</span></span><span class="line">    <span class="kw">while</span> <span class="fn">len</span>(values) &lt; DATA_LIMIT:</span><span class="line">        <span class="kw">try</span>:</span><span class="line">            line = ser.<span class="fn">readline</span>().<span class="fn">decode</span>().<span class="fn">strip</span>()</span><span class="line">            <span class="kw">if</span> line.<span class="fn">isdigit</span>():</span><span class="line">                v = <span class="fn">int</span>(line)</span><span class="line">                now = datetime.datetime.<span class="fn">now</span>().<span class="fn">strftime</span>(<span class="str">"%H:%M:%S"</span>)</span><span class="line">                values.<span class="fn">append</span>(v); times.<span class="fn">append</span>(now)</span><span class="line">                <span class="fn">print</span>(<span class="fn">len</span>(values), now, v)</span><span class="line">        <span class="kw">except</span>:</span><span class="line">            <span class="kw">pass</span></span><span class="line"><span class="cm"># with 블록을 벗어나면 포트가 닫혀 시리얼 모니터를 다시 쓸 수 있음</span></span><span class="line"></span><span class="line">pd.<span class="fn">DataFrame</span>({<span class="str">'시간'</span>: times, <span class="str">'데이터'</span>: values}).<span class="fn">to_csv</span>(<span class="str">'light_log.csv'</span>, index=<span class="kw">False</span>, encoding=<span class="str">'utf-8-sig'</span>)</span><span class="line">plt.<span class="fn">plot</span>(values); plt.<span class="fn">ylabel</span>(<span class="str">'light'</span>); plt.<span class="fn">show</span>()</span></code></pre></div>
+    <div class="modify"><div class="bt">🔧 이렇게 바꿔 나만의 로거로</div>
+    <ul>
+    <li><b>수집 개수·주기</b> : <code>DATA_LIMIT</code>과 아두이노 <code>delay</code>를 조절.</li>
+    <li><b>다른 센서</b> : 아두이노에서 온도/거리 값을 보내고 <code>ylabel</code>을 바꾸기.</li>
+    <li><b>여러 값 동시</b> : 아두이노에서 CSV로 보내고 파이썬 <code>line.split(',')</code>로 나누기.</li>
+    </ul></div>
+    </div>
+  </div>
+  <div class="box mission"><div class="bt">🎮 미션</div>수집한 <code>light_log.csv</code>(<code>시간</code>·<code>데이터</code> 두 열)를 열어 <b>평균·최댓값</b>을 구하고, 어느 시간대에 값이 컸는지 살펴보기. <span class="mut">예: <code>df['데이터'].mean()</code>, <code>df['데이터'].max()</code> / 최댓값이 나온 시각은 <code>df.loc[df['데이터'].idxmax(), '시간']</code>.</span></div>
+  </div>
+</section>
+
+<!-- ============ 차시 5 : WiFi (선택) ============ -->
+<section class="part" id="s5">
+  <div class="part-head" style="border-left-color:var(--cyan);background:linear-gradient(90deg,var(--cyan-l),#fff 70%)">
+    <div class="ses" style="color:#0e7490">5차시 · 확장</div>
+    <h2>WiFi 무선 통신 &amp; 확장 <span class="badge wifi">D1 R32</span></h2>
+    <div class="goalline">3~4차시에서 쓰던 같은 D1 R32로, 유선 대신 WiFi(TCP)로 센서 값을 무선 전송·수집한다.</div>
+  </div>
+  <div class="part-body" id="models">
+  <div class="box tip"><div class="bt">🧭 유선 → 무선, 같은 보드로</div>
+  3~4차시에서 D1 R32로 <b>유선 시리얼</b> 수집을 했습니다. 이제 <b>같은 보드·같은 배선</b>에서 케이블 대신 <b>WiFi</b>로 값을 보냅니다(선이 걸리적거리거나 떨어진 곳에서 관측할 때 유리). 이론은 2차시(WiFi·TCP)에서 다뤘습니다.</div>
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li>(3차시에서 이미 세팅한) D1 R32를 WiFi에 연결하고 IP를 확인할 수 있다.</li>
+  <li>D1 R32를 <b>TCP 서버</b>로 만들어 센서 값을 내보낼 수 있다.</li>
+  <li>파이썬 <code>socket</code>으로 접속해 값을 무선 수신·저장·시각화할 수 있다.</li>
+  </ul></div>
+
+  <h3><span class="num">5-1</span>같은 D1 R32, 이번엔 WiFi로</h3>
+  <p>3차시에서 세팅·배선한 <b>바로 그 D1 R32</b>를 그대로 씁니다. ESP32에는 <b>WiFi가 내장</b>되어 있어, 유선(USB)으로 보내던 값을 이제 <b>무선</b>으로 보낼 수 있습니다. 보드 세팅·조도 배선(<b>3V3·IO34</b>)은 3차시 그대로이니 새로 할 것이 없습니다.</p>
+  <div class="box warn"><div class="bt">⚠️ 업로드가 안 되면</div>
+  <code>Failed uploading: ... exit status 1</code> 오류 시 보드의 <b>BOOT 버튼을 누른 채</b> 업로드, CH340 드라이버 재설치, 케이블/포트 재확인, 업로드 속도 낮추기(921600→115200)를 시도합니다.</div>
+
+  <h3><span class="num">5-2</span>🧪 D1 R32 — WiFi 연결 & IP 확인</h3>
+  <p>먼저 공유기에 연결해 <b>내 보드의 IP 주소</b>를 시리얼 모니터로 확인합니다. 이 IP를 파이썬에 입력하게 됩니다.</p>
+  <div class="code"><div class="ch"><span class="lang">Arduino(D1 R32) · 실습코드 #02</span><span>WiFi 연결 & IP 확인</span></div>
+<pre><code><span class="line"><span class="pp">#include</span> <span class="str">&lt;WiFi.h&gt;</span></span><span class="line"><span class="kw">const char</span>* ssid     = <span class="str">"iotcamp"</span>;      <span class="cm">// ← 공유기 이름(SSID)</span></span><span class="line"><span class="kw">const char</span>* password = <span class="str">"********"</span>;    <span class="cm">// ← 공유기 비밀번호</span></span><span class="line"><span class="kw">void</span> <span class="fn">setup</span>() {</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">begin</span>(<span class="num">115200</span>);</span><span class="line">  WiFi.<span class="fn">begin</span>(ssid, password);</span><span class="line">  <span class="kw">while</span> (WiFi.<span class="fn">status</span>() != WL_CONNECTED) { <span class="fn">delay</span>(<span class="num">500</span>); <span class="fn">Serial</span>.<span class="fn">print</span>(<span class="str">"."</span>); }</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">println</span>(<span class="str">"\nWiFi 연결됨"</span>);</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">print</span>(<span class="str">"IP 주소: "</span>);</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">println</span>(WiFi.<span class="fn">localIP</span>());   <span class="cm">// ← 이 IP를 파이썬에 입력!</span></span><span class="line">}</span><span class="line"><span class="kw">void</span> <span class="fn">loop</span>() {}</span></code></pre></div>
+  <div class="box tip"><div class="bt">💡 IP 주소 확인</div>업로드 후 <span class="kbd">시리얼 모니터</span>(115200)를 열면 <code>IP 주소: 192.168.0.10</code>처럼 표시됩니다. 이 숫자를 기록해 두세요.</div>
+
+  <h3><span class="num">5-3</span>🧪 WiFi로 센서 값 보내기 (TCP 서버) — 예제 #2</h3>
+  <p>D1 R32를 <b>TCP 서버(포트 5000)</b>로 만들어 접속한 PC에 조도 값을 계속 보냅니다.</p>
+  <div class="project" id="model2">
+    <div class="ph"><h4>🛠 예제 #2 · WiFi 무선 조도 센서 (D1 R32 → TCP → PC)</h4><span class="badge model">수정 가능 예제 #2</span> <span class="badge wifi">WiFi</span></div>
+    <div class="pb">
+    <div class="pmeta"><span class="t">입력: 조도 IO34</span><span class="t">통신: WiFi TCP:5000</span><span class="t">수신: socket</span></div>
+    <figure>
+    <svg viewBox="0 0 620 170" role="img" aria-label="WiFi 무선 조도 센서 회로 (D1 R32 + 조도센서 모듈)">
+      <rect x="30" y="45" width="140" height="90" rx="12" fill="#0e7490"/>
+      <rect x="420" y="40" width="170" height="98" rx="12" fill="#fffbe8" stroke="#ca8a04" stroke-width="2"/>
+      <circle cx="505" cy="112" r="10" fill="#fde68a" stroke="#ca8a04"/>
+      <line x1="170" y1="60" x2="420" y2="60" class="wire" stroke="#e11d48"/>
+      <line x1="170" y1="86" x2="420" y2="86" class="wire" stroke="#0284c7"/>
+      <line x1="170" y1="118" x2="420" y2="118" class="wire" stroke="#334155"/>
+      <text x="100" y="95" text-anchor="middle" class="lbl" fill="#fff">D1 R32</text>
+      <text x="505" y="68" text-anchor="middle" class="lbl-s" fill="#854d0e">조도센서 모듈</text>
+      <text x="505" y="84" text-anchor="middle" class="lbl-s" fill="#a16207">(저항 내장)</text>
+      <g class="pin wlbl" fill="#334155">
+        <text x="196" y="52">VCC → 3V3</text>
+        <text x="196" y="78">A0 → IO34</text>
+        <text x="196" y="110">GND → GND</text>
+        <text x="196" y="134" fill="#9aa3b2">D0 → 사용 안 함</text>
+      </g>
+    </svg>
+    <figcaption>배선은 유선과 동일(<b>VCC→3V3·GND→GND·A0→IO34</b>) · 값은 WiFi로 전송</figcaption>
+    </figure>
+    <div class="code"><div class="ch"><span class="lang">Arduino(D1 R32) · 모델링 예제 #2</span><span>WiFi TCP 서버 — 조도 전송</span></div>
+<pre><code><span class="line"><span class="pp">#include</span> <span class="str">&lt;WiFi.h&gt;</span></span><span class="line"><span class="kw">const char</span>* ssid     = <span class="str">"iotcamp"</span>;</span><span class="line"><span class="kw">const char</span>* password = <span class="str">"********"</span>;</span><span class="line">WiFiServer server(<span class="num">5000</span>);       <span class="cm">// 포트 5000으로 서버 열기</span></span><span class="line">WiFiClient client;</span><span class="line"><span class="kw">void</span> <span class="fn">setup</span>() {</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">begin</span>(<span class="num">115200</span>);</span><span class="line">  <span class="fn">analogReadResolution</span>(<span class="num">12</span>);      <span class="cm">// ESP32 ADC 12비트(0~4095)</span></span><span class="line">  WiFi.<span class="fn">begin</span>(ssid, password);</span><span class="line">  <span class="kw">while</span> (WiFi.<span class="fn">status</span>() != WL_CONNECTED) { <span class="fn">delay</span>(<span class="num">500</span>); }</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">print</span>(<span class="str">"IP: "</span>); <span class="fn">Serial</span>.<span class="fn">println</span>(WiFi.<span class="fn">localIP</span>());</span><span class="line">  server.<span class="fn">begin</span>();</span><span class="line">}</span><span class="line"><span class="kw">void</span> <span class="fn">loop</span>() {</span><span class="line">  <span class="kw">if</span> (!client || !client.<span class="fn">connected</span>()) {</span><span class="line">    client = server.<span class="fn">available</span>();   <span class="cm">// PC 접속 대기</span></span><span class="line">    <span class="kw">return</span>;</span><span class="line">  }</span><span class="line">  <span class="kw">int</span> light = <span class="fn">analogRead</span>(<span class="num">34</span>);   <span class="cm">// 조도센서(IO34)</span></span><span class="line">  client.<span class="fn">println</span>(light);          <span class="cm">// 값 + 줄바꿈을 WiFi로 전송</span></span><span class="line">  <span class="fn">delay</span>(<span class="num">500</span>);</span><span class="line">}</span></code></pre></div>
+    <div class="code py"><div class="ch"><span class="lang">Python · 모델링 예제 #2</span><span>WiFi 소켓으로 값 받기</span></div>
+<pre><code><span class="line"><span class="kw">import</span> socket</span><span class="line">HOST = <span class="str">'192.168.0.10'</span>   <span class="cm"># ← 시리얼에 뜬 D1 R32의 IP</span></span><span class="line">PORT = <span class="num">5000</span></span><span class="line"><span class="kw">with</span> socket.<span class="fn">socket</span>(socket.AF_INET, socket.SOCK_STREAM) <span class="kw">as</span> s:  <span class="cm"># with: 끝나면 소켓 자동 반납</span></span><span class="line">    s.<span class="fn">connect</span>((HOST, PORT))       <span class="cm"># 서버(D1 R32)에 접속</span></span><span class="line">    <span class="kw">while</span> <span class="kw">True</span>:</span><span class="line">        chunk = s.<span class="fn">recv</span>(<span class="num">1024</span>)          <span class="cm"># 원본 바이트</span></span><span class="line">        <span class="kw">if</span> <span class="kw">not</span> chunk:                 <span class="cm"># 빈 바이트 = 연결 종료</span></span><span class="line">            <span class="kw">break</span></span><span class="line">        data = chunk.<span class="fn">decode</span>().<span class="fn">strip</span>()</span><span class="line">        <span class="kw">if</span> data:                      <span class="cm"># 개행만 온 조각(빈 줄)은 건너뛰기</span></span><span class="line">            <span class="fn">print</span>(data)</span></code></pre></div>
+    <div class="box tip"><div class="bt">💡 이건 WiFi 소켓 — 시리얼 모니터와 충돌하지 않아요</div>
+    예제 #2·#3은 <b>WiFi(TCP 소켓)</b>라 유선(시리얼) 실습과 달리 <b>COM 포트 충돌이 없습니다</b>(IP 확인용 시리얼 모니터를 켜 둬도 됩니다). 다만 소켓도 <b>다 쓰면 닫아야</b> 하므로 <code>with socket.socket(...) as s:</code>로 감쌌습니다 → <span class="kbd">Ctrl+C</span>로 멈춰도 소켓이 <b>자동 반납</b>되어 보드(단일 접속 서버)에 <b>바로 다시 접속</b>할 수 있습니다. <code>with</code> 없이 강제 종료하면 이전 연결이 남아 <b>다음 실행 때 접속이 안 될</b> 수 있어요.</div>
+    <div class="modify"><div class="bt">🔧 이렇게 바꿔 나만의 무선 센서로</div>
+    <ul>
+    <li><b>다른 센서</b> : IO34에 온도·소리·물 센서를 연결해 무선 전송.</li>
+    <li><b>여러 값</b> : <code>client.println(String(t)+","+String(h))</code>로 CSV 한 줄 전송 → 파이썬에서 <code>split(',')</code>.</li>
+    <li><b>전송 주기</b> : 아두이노 <code>delay</code>로 조절.</li>
+    <li><b>포트 번호</b> : 5000 대신 다른 번호로 바꿔도 됨(양쪽 동일하게).</li>
+    </ul></div>
+    </div>
+  </div>
+
+  <h3><span class="num">5-4</span>WiFi 실시간 수집·시각화·CSV — 예제 #3</h3>
+  <p>받은 값을 모아 그래프로 그리고 CSV로 저장합니다. WiFi(TCP)는 데이터가 <b>덩어리로</b> 도착할 수 있으므로, <b>줄바꿈(\n) 기준으로 잘라</b> 한 줄씩 처리합니다.</p>
+  <div class="project" id="model3">
+    <div class="ph"><h4>🛠 예제 #3 · WiFi 데이터 로거 (D1 R32 → 실시간 그래프·CSV)</h4><span class="badge model">수정 가능 예제 #3</span> <span class="badge wifi">WiFi</span></div>
+    <div class="pb">
+    <p>아두이노는 예제 #2와 동일합니다(TCP 서버로 값 전송). 파이썬만 <b>수집·시각화·저장</b>까지 확장합니다.</p>
+    <div class="pmeta"><span class="t">통신: WiFi TCP:5000</span><span class="t">수집: socket</span><span class="t">저장: CSV(pandas)</span><span class="t">시각화: matplotlib</span></div>
+    <div class="box tip"><div class="bt">🔗 어떤 아두이노 코드와 짝인가</div>
+    이 로거는 <b>모델링 예제 #2의 아두이노 코드</b>(WiFi TCP 서버 — <code>client.println(light)</code>)를 <b>그대로</b> 씁니다. 아두이노는 새로 올릴 것이 없고, <b>파이썬만</b> 수집·시각화·저장까지 확장합니다.</div>
+    <div class="code py"><div class="ch"><span class="lang">Python · 모델링 예제 #3</span><span>WiFi 수집 → CSV → 그래프 (← 아두이노 예제 #2)</span></div>
+<pre><code><span class="line"><span class="kw">import</span> socket, datetime</span><span class="line"><span class="kw">import</span> pandas <span class="kw">as</span> pd</span><span class="line"><span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt</span><span class="line"></span><span class="line">HOST = <span class="str">'192.168.0.10'</span>   <span class="cm"># ← D1 R32의 IP</span></span><span class="line">PORT = <span class="num">5000</span>; DATA_LIMIT = <span class="num">100</span></span><span class="line">buf = <span class="str">''</span>; values, times = [], []</span><span class="line"></span><span class="line"><span class="kw">with</span> socket.<span class="fn">socket</span>(socket.AF_INET, socket.SOCK_STREAM) <span class="kw">as</span> s:  <span class="cm"># with: 끝나면 소켓 자동 반납</span></span><span class="line">    s.<span class="fn">connect</span>((HOST, PORT))</span><span class="line">    <span class="kw">while</span> <span class="fn">len</span>(values) &lt; DATA_LIMIT:</span><span class="line">        buf += s.<span class="fn">recv</span>(<span class="num">1024</span>).<span class="fn">decode</span>(errors=<span class="str">'ignore'</span>)</span><span class="line">        <span class="kw">while</span> <span class="str">'\n'</span> <span class="kw">in</span> buf:                 <span class="cm"># 줄 단위로 잘라 처리</span></span><span class="line">            line, buf = buf.<span class="fn">split</span>(<span class="str">'\n'</span>, <span class="num">1</span>)</span><span class="line">            line = line.<span class="fn">strip</span>()</span><span class="line">            <span class="kw">if</span> line.<span class="fn">isdigit</span>():</span><span class="line">                v = <span class="fn">int</span>(line)</span><span class="line">                now = datetime.datetime.<span class="fn">now</span>().<span class="fn">strftime</span>(<span class="str">"%H:%M:%S"</span>)</span><span class="line">                values.<span class="fn">append</span>(v); times.<span class="fn">append</span>(now)</span><span class="line">                <span class="fn">print</span>(<span class="fn">len</span>(values), v)</span><span class="line"></span><span class="line">pd.<span class="fn">DataFrame</span>({<span class="str">'시간'</span>: times, <span class="str">'데이터'</span>: values}).<span class="fn">to_csv</span>(<span class="str">'wifi_log.csv'</span>, index=<span class="kw">False</span>, encoding=<span class="str">'utf-8-sig'</span>)</span><span class="line">plt.<span class="fn">plot</span>(values); plt.<span class="fn">ylabel</span>(<span class="str">'light'</span>); plt.<span class="fn">show</span>()</span></code></pre></div>
+    <div class="modify"><div class="bt">🔧 이렇게 바꿔 나만의 무선 로거로</div>
+    <ul>
+    <li><b>수집 개수·주기</b> : <code>DATA_LIMIT</code>과 아두이노 <code>delay</code>를 조절.</li>
+    <li><b>여러 값</b> : CSV 한 줄을 <code>line.split(',')</code>로 나눠 여러 열로 저장.</li>
+    <li><b>원격 관측</b> : 보드를 창가·화분 옆에 두고 노트북에서 멀리서 값 확인.</li>
+    </ul></div>
+    </div>
+  </div>
+  <div class="box tip"><div class="bt">💡 세 예제의 관계</div>
+  예제 #1(유선)에서 <b>수집·저장·시각화</b>를, 예제 #2(WiFi)에서 <b>무선 TCP 전송</b>을, 예제 #3에서 둘을 합쳐 <b>WiFi 실시간 로거</b>를 완성했습니다. 다음 심화 챕터에서는 이 값을 <b>서버에 올려 누적</b>하고, 산출물은 이 예제들을 바탕으로 확장합니다.</div>
+  </div>
+</section>
+
+<!-- ============ 심화 : 서버 업로드 (원격 대시보드) ============ -->
+<section class="part" id="server">
+  <div class="part-head" style="border-left-color:#7c3aed;background:linear-gradient(90deg,#f5f3ff,#fff 70%)">
+    <div class="ses" style="color:#6d28d9">심화 · 집에서 도전 <span class="badge opt">확장</span></div>
+    <h2>센서 데이터를 서버에 올려 누적하기 <span class="badge wifi">WiFi</span></h2>
+    <div class="goalline">예제 #3(내 PC 로거)에서 한 걸음 더 — 값을 인터넷 너머 서버로 보내 24시간 누적하고, 로그인해서 내 데이터만 조회한다.</div>
+  </div>
+  <div class="part-body">
+
+  <div class="box tip"><div class="bt">🧭 예제 #3에서 이어집니다</div>
+  예제 #3까지는 값을 <b>내 PC</b>로만 모았습니다. 좋지만 한계가 있어요 — <b>PC를 켜 둬야</b> 하고, <b>나만</b> 볼 수 있고, PC를 끄면 그동안 값이 <b>끊깁니다</b>. 이 챕터에서는 값을 <b>서버(원격 대시보드)</b>로 보내 언제·어디서나 <b>누적·조회</b>합니다. <span class="mut">(수업 6차시 범위 밖 · 집에서 도전용)</span></div>
+
+  <div class="box goal"><div class="bt">🎯 학습목표</div>
+  <ul>
+  <li>ESP32가 <b>서버로 값을 보내는(HTTP POST)</b> 원리를 이해한다.</li>
+  <li>대시보드에 <b>회원가입·로그인</b>하고 <b>내 API 키</b>로 데이터를 올릴 수 있다.</li>
+  <li>누적된 데이터를 <b>기간·집계 단위</b>로 조회하고 CSV로 내보낼 수 있다.</li>
+  </ul></div>
+
+  <h3><span class="num">S-1</span>왜 서버에 올릴까 — PC 로거 vs 서버 누적</h3>
+  <table>
+    <tr><th style="width:120px">구분</th><th>예제 #3 (내 PC)</th><th>서버 누적 (이 챕터)</th></tr>
+    <tr><td>켜 둘 것</td><td>내 PC가 계속 켜져 있어야</td><td>보드만 켜두면 됨(서버는 항상 가동)</td></tr>
+    <tr><td>보는 곳</td><td>내 PC 앞에서만</td><td>어디서나 로그인 → 내 데이터</td></tr>
+    <tr><td>여러 명</td><td>각자 PC 따로</td><td>한 서버에 여러 명, 계정별 분리</td></tr>
+    <tr><td>기간</td><td>실행하는 동안만</td><td>며칠·몇 주 장기 누적</td></tr>
+  </table>
+
+  <h3><span class="num">S-2</span>구조 — 보드는 "보내는 쪽"</h3>
+  <figure>
+  <svg viewBox="0 0 720 200" role="img" aria-label="서버 업로드 구조도">
+    <defs>
+    <marker id="svr" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c3aed"/></marker>
+    <marker id="svr2" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#ca8a04"/></marker>
+    </defs>
+    <rect x="20" y="66" width="150" height="74" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+    <rect x="285" y="56" width="180" height="94" rx="12" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+    <rect x="560" y="66" width="140" height="74" rx="12" fill="#fef9c3" stroke="#ca8a04" stroke-width="2"/>
+    <line x1="170" y1="92" x2="283" y2="92" class="wire" stroke="#7c3aed" marker-end="url(#svr)"/>
+    <line x1="560" y1="116" x2="467" y2="116" class="wire" stroke="#ca8a04" marker-end="url(#svr2)"/>
+    <text x="95" y="98" text-anchor="middle" class="lbl" fill="#5b21b6">ESP32</text>
+    <text x="95" y="118" text-anchor="middle" class="lbl-s" fill="#6d28d9">+ 조도센서</text>
+    <text x="375" y="96" text-anchor="middle" class="lbl" fill="#075985">서버 · 대시보드</text>
+    <text x="375" y="116" text-anchor="middle" class="lbl-s" fill="#0369a1">데이터 누적(DB)</text>
+    <text x="630" y="98" text-anchor="middle" class="lbl" fill="#854d0e">브라우저</text>
+    <text x="630" y="118" text-anchor="middle" class="lbl-s" fill="#a16207">로그인 조회</text>
+    <text x="226" y="84" text-anchor="middle" class="lbl-s wlbl" fill="#5b21b6">HTTP POST</text>
+    <text x="513" y="108" text-anchor="middle" class="lbl-s wlbl" fill="#854d0e">로그인</text>
+  </svg>
+  <figcaption>ESP32가 서버로 <b>HTTP POST</b>(밖으로 나가는 요청)만 하므로 집·학교에 <b>포트포워딩이 필요 없습니다</b>. 사용자는 브라우저로 로그인해 <b>내 데이터만</b> 봅니다.</figcaption>
+  </figure>
+  <div class="box concept"><div class="bt">💡 핵심 개념 3가지</div>
+  <ul>
+  <li><b>HTTP POST</b> : 예제 #2·#3의 TCP처럼 값을 보내되, 웹 표준 방식(주소 + JSON 본문)으로 보냅니다.</li>
+  <li><b>API 키</b> : "누가 보낸 값인지" 식별하는 <b>내 전용 열쇠</b>. 로그인 후 발급받아 보드 코드에 넣습니다.</li>
+  <li><b>계정 분리</b> : 서버가 API 키로 주인을 확인해 <b>내 데이터만</b> 내 대시보드에 보여줍니다.</li>
+  </ul></div>
+
+  <h3><span class="num">S-3</span>준비 — 회원가입·로그인·API 키</h3>
+  <div class="box tip"><div class="bt">📄 진행 순서</div>
+  <ul>
+  <li><b>1) 서버 접속</b> : 대시보드 주소로 접속 <span class="mut">(<code>https://dashboard.boram-iot.com</code>)</span>.</li>
+  <li><b>2) 회원가입</b> : 이름·소속·이메일·아이디·비밀번호(+확인) 입력 → <b>승인 대기</b> 상태가 됩니다.</li>
+  <li><b>3) 승인</b> : 관리자(선생님)가 승인하면 로그인할 수 있습니다.</li>
+  <li><b>4) 로그인 → 내 API 키 복사</b> : 대시보드의 <b>내 API 키</b>(<code>stu_...</code>)를 복사해 둡니다.</li>
+  </ul></div>
+
+  <h3><span class="num">S-4</span>ESP32 코드 — WiFi로 값 POST</h3>
+  <p>예제 #2·#3의 배선(<b>조도 IO34</b>)을 그대로 쓰고, 코드만 <b>서버로 POST</b>하도록 바꿉니다. 아래에서 <b>WiFi 이름·비밀번호</b>와 <b>내 API 키</b> 세 줄만 내 것으로 채우면 됩니다.</p>
+  <div class="code"><div class="ch"><span class="lang">Arduino(D1 R32) · 심화 예제</span><span>WiFi → 서버로 값 POST</span></div>
+<pre><code><span class="line"><span class="pp">#include</span> <span class="str">&lt;WiFi.h&gt;</span></span><span class="line"><span class="pp">#include</span> <span class="str">&lt;HTTPClient.h&gt;</span></span><span class="line"><span class="pp">#include</span> <span class="str">&lt;WiFiClientSecure.h&gt;</span></span><span class="line"></span><span class="line"><span class="kw">const char</span>* ssid     = <span class="str">"우리WiFi"</span>;      <span class="cm">// ← 공유기 이름</span></span><span class="line"><span class="kw">const char</span>* password = <span class="str">"********"</span>;      <span class="cm">// ← 공유기 비밀번호</span></span><span class="line"><span class="kw">const char</span>* SERVER   = <span class="str">"https://dashboard.boram-iot.com/api/ingest"</span>;</span><span class="line"><span class="kw">const char</span>* API_KEY  = <span class="str">"stu_붙여넣기"</span>;  <span class="cm">// ← 대시보드에서 복사한 내 API 키</span></span><span class="line"></span><span class="line"><span class="cm">// 값 1개를 서버로 전송 (sensor 이름으로 구분)</span></span><span class="line"><span class="kw">void</span> <span class="fn">postReading</span>(<span class="kw">const char</span>* sensor, <span class="kw">float</span> value) {</span><span class="line">  WiFiClientSecure client;</span><span class="line">  client.<span class="fn">setInsecure</span>();                 <span class="cm">// (학습용) 인증서 검증 생략</span></span><span class="line">  HTTPClient http;</span><span class="line">  http.<span class="fn">begin</span>(client, SERVER);</span><span class="line">  http.<span class="fn">addHeader</span>(<span class="str">"Content-Type"</span>, <span class="str">"application/json"</span>);</span><span class="line">  http.<span class="fn">addHeader</span>(<span class="str">"X-API-Key"</span>, API_KEY); <span class="cm">// ← 누구 데이터인지 식별</span></span><span class="line">  String body = <span class="fn">String</span>(<span class="str">"{\"sensor\":\""</span>) + sensor + <span class="str">"\",\"value\":"</span> + value + <span class="str">"}"</span>;</span><span class="line">  <span class="kw">int</span> code = http.<span class="fn">POST</span>(body);</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">printf</span>(<span class="str">"POST %d\n"</span>, code);     <span class="cm">// 200 성공 / 401 키오류</span></span><span class="line">  http.<span class="fn">end</span>();</span><span class="line">}</span><span class="line"></span><span class="line"><span class="kw">void</span> <span class="fn">setup</span>() {</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">begin</span>(<span class="num">115200</span>);</span><span class="line">  <span class="fn">analogReadResolution</span>(<span class="num">12</span>);</span><span class="line">  WiFi.<span class="fn">begin</span>(ssid, password);</span><span class="line">  <span class="kw">while</span> (WiFi.<span class="fn">status</span>() != WL_CONNECTED) <span class="fn">delay</span>(<span class="num">500</span>);</span><span class="line">  <span class="fn">Serial</span>.<span class="fn">println</span>(<span class="str">"WiFi 연결됨"</span>);</span><span class="line">}</span><span class="line"></span><span class="line"><span class="kw">void</span> <span class="fn">loop</span>() {</span><span class="line">  <span class="kw">int</span> light = <span class="fn">analogRead</span>(<span class="num">34</span>);           <span class="cm">// 조도(IO34)</span></span><span class="line">  <span class="fn">postReading</span>(<span class="str">"light"</span>, light);          <span class="cm">// 서버로 전송</span></span><span class="line">  <span class="fn">delay</span>(<span class="num">2000</span>);                          <span class="cm">// 2초마다 (서버 기록 최소 주기 500)</span></span><span class="line">}</span></code></pre></div>
+  <div class="modify"><div class="bt">🔧 이렇게 바꿔 나만의 서버 로거로</div>
+  <ul>
+  <li><b>여러 센서</b> : <code>postReading("light", light)</code> 아래에 <code>postReading("sensor2", analogRead(39))</code>처럼 <b>이름을 다르게</b> 한 줄 더 → 대시보드 <b>센서 드롭다운</b>에 자동 추가.</li>
+  <li><b>전송 주기</b> : <code>delay(2000)</code>(2초)를 조절. <b>서버 스펙상 기록 가능한 가장 빠른 주기는 <code>delay(500)</code>(0.5초)</b>입니다.</li>
+  <li><b>로컬 서버 테스트</b> : https 대신 <code>http://PC아이피:포트</code>로 보낼 땐 <code>WiFiClientSecure</code>·<code>setInsecure</code> 대신 <code>http.begin(SERVER)</code>만 씁니다.</li>
+  </ul></div>
+  <div class="box warn"><div class="bt">⏱ 전송 주기의 하한 — <code>delay(500)</code></div>
+  <b>서버 스펙상 기록 가능한 가장 빠른 주기는 <code>delay(500)</code>(0.5초)</b>입니다. 그보다 짧게 보내도 서버가 더 촘촘히 저장하지 않으니, 가장 빠르게 보내려면 <code>delay(500)</code>을 <b>최소값</b>으로 쓰세요.</div>
+  <div class="box warn"><div class="bt">⚠️ API 키는 비밀 · 결과 확인</div>
+  <b>API 키</b>는 내 계정의 열쇠라 남에게 보이거나 코드 공유 시 노출되지 않게 주의하세요. 업로드 후 <b>시리얼 모니터</b>에 <code>POST 200</code>이면 성공, <code>POST 401</code>이면 <b>API 키 오류</b>(다시 복사), <code>POST -1</code>이면 <b>WiFi·주소 문제</b>입니다.</div>
+
+  <h3><span class="num">S-5</span>대시보드에서 확인 — 기간·집계·CSV</h3>
+  <p>브라우저로 대시보드에 로그인하면 내가 올린 값이 실시간으로 쌓입니다.</p>
+  <ul>
+  <li><b>센서 선택</b> : 여러 이름으로 보냈다면 드롭다운에서 골라 봅니다.</li>
+  <li><b>기간</b> : 최근 / 1시간 / 24시간 / 오늘 / 날짜 지정 / 월 지정 / 전체.</li>
+  <li><b>집계 단위</b> : 원본 · 1초 · 10초 · 30초 · 1분 · 5분 · 1시간 · 1일 (구간 평균).</li>
+  <li><b>CSV 내보내기</b> : 현재 선택(센서·기간)이 그대로 저장됩니다.</li>
+  </ul>
+  <div class="box tip"><div class="bt">💡 타임라인이 함께 저장됩니다</div>
+  서버는 각 값에 <b>밀리초 단위 시각</b>을 함께 기록하므로, <b>시간별·일별·월별</b> 조회와 다양한 <b>집계</b>가 가능합니다.</div>
+
+  <h3><span class="num">S-6</span>직접 서버를 운영하려면 (코드·설치)</h3>
+  <p>서버·대시보드 전체 코드와 설치 방법(회원 관리·API·시계열 조회)은 공개 저장소에 있습니다. <b>Docker + Cloudflare Tunnel</b>로 공인 IP 없이도 <b>내 도메인 + 자동 HTTPS</b>로 공개합니다(이 캠프는 <code>dashboard.boram-iot.com</code>).</p>
+  <ul>
+  <li>공개 저장소 : <a href="https://github.com/powerspt/iot-sensor-dashboard" target="_blank" rel="noopener">github.com/powerspt/iot-sensor-dashboard</a></li>
+  <li>포함 : 방법1(로컬 PC) · 방법2(원격 계정) 서버 코드, ESP32 코드, 설치 매뉴얼(README)</li>
+  </ul>
+  <div class="box tip"><div class="bt">🧩 방법 1 · 방법 2</div>
+  <b>방법 1(로컬 PC)</b>은 인터넷·계정 없이 같은 WiFi에서 내 PC로 모으는 방식(예제 #3의 확장), <b>방법 2(원격 계정)</b>는 이 챕터처럼 서버에 누적·계정 조회하는 방식입니다.</div>
+  </div>
+</section>
+
+<!-- ============ 차시 6 : 산출물 ============ -->
+<section class="part" id="s6">
+  <div class="part-head"><div class="ses">6차시 · 산출물</div>
+    <h2>나만의 사물인터넷(IoT) 장치 구현하기</h2>
+    <div class="goalline">통신·수집·시각화를 활용해 나만의 IoT 장치를 구현하고 시연·발표한다. <span class="mut">(제출 서식은 별도 「보고서」 파일)</span></div>
+  </div>
+  <div class="part-body">
+  <div class="box goal"><div class="bt">🎯 산출물 목표</div>
+  실제 문제를 하나 정해, <b>센서로 측정 → (유선/WiFi) 통신으로 수집 → PC에서 저장(CSV)·시각화·분석</b>하는 나만의 IoT 장치를 구현하고, 공식 제출 양식인 <b>「활동 계획서(과제 1)」와 「수강 보고서」</b>를 완성해 시연·발표한다.</div>
+
+  <div class="box concept"><div class="bt">💡 초급보다 깊고 넓게 — 중급 산출물의 조건</div>
+  <ul>
+  <li><b>데이터 중심</b> : 단순 반응(초급)을 넘어, <b>값을 수집·저장(CSV)·시각화</b>하고 <b>해석</b>까지 한다.</li>
+  <li><b>통신 선택</b> : 유선(시리얼)을 기본으로 하되, 필요하면 <b>WiFi</b>로 확장한다.</li>
+  <li><b>설계 근거</b> : 왜 그 <b>센서·통신 방식·샘플링 주기</b>를 골랐는지 이론(1~2차시)으로 설명한다.</li>
+  <li><b>확장성</b> : 여러 값·여러 센서, 임계값 알림, 원격 관측 등 한 단계 더 나아간다.</li>
+  </ul></div>
+
+  <h3><span class="num">6-1</span>구현 5단계</h3>
+  <figure>
+  <svg viewBox="0 0 720 120" role="img" aria-label="구현 5단계">
+    <defs><marker id="s6a" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4f46e5"/></marker></defs>
+    <g fill="#f2f2ff" stroke="#4f46e5">
+    <rect x="8" y="35" width="126" height="50" rx="10"/><rect x="156" y="35" width="126" height="50" rx="10"/>
+    <rect x="304" y="35" width="126" height="50" rx="10"/><rect x="452" y="35" width="126" height="50" rx="10"/>
+    <rect x="600" y="35" width="112" height="50" rx="10"/></g>
+    <g stroke="#4f46e5" class="wire">
+    <line x1="134" y1="60" x2="154" y2="60" marker-end="url(#s6a)"/><line x1="282" y1="60" x2="302" y2="60" marker-end="url(#s6a)"/>
+    <line x1="430" y1="60" x2="450" y2="60" marker-end="url(#s6a)"/><line x1="578" y1="60" x2="598" y2="60" marker-end="url(#s6a)"/></g>
+    <g class="lbl-s" fill="#4338ca" text-anchor="middle">
+    <text x="71" y="58">①문제·데이터</text><text x="71" y="74">정하기</text>
+    <text x="219" y="58">②센서·통신</text><text x="219" y="74">방식 선택</text>
+    <text x="367" y="58">③회로·코드</text><text x="367" y="74">(예제 변형)</text>
+    <text x="515" y="58">④수집·저장</text><text x="515" y="74">·시각화</text>
+    <text x="656" y="58">⑤해석·발표</text></g>
+  </svg>
+  </figure>
+  <div class="box tip"><div class="bt">💡 부품·통신 고르기</div>
+  <ul>
+  <li>센서는 <b>초급 교재 1차시의 「센서·액추에이터」 표</b>와 <b><a href="#appendixF">부록 F</a></b>에서 고르세요.</li>
+  <li>통신 방식은 <b>2차시 비교표</b>를 근거로 유선/WiFi를 선택하세요(원격·이동 필요 → WiFi).</li>
+  <li>회로 아이디어는 <b>Tinkercad Circuits</b>(초급 1-5, UNO 기준)로 감을 잡되, <b>D1 R32·WiFi는 실물로 진행</b>합니다(Tinkercad는 ESP32 미지원).</li>
+  </ul></div>
+
+  <h3><span class="num">6-2</span>아이디어 예시 <span class="badge uno">중급</span></h3>
+  <table>
+    <tr><th>아이디어</th><th>센서 → 통신 → 처리</th><th>바탕 예제</th></tr>
+    <tr><td>우리 교실 밝기·온도 하루 기록·분석</td><td>조도/DHT11 → 시리얼 → CSV·그래프</td><td>#1</td></tr>
+    <tr><td>창가 화분 환경 원격 모니터</td><td>토양수분/온도 → WiFi → 수집·경보</td><td>#2·#3</td></tr>
+    <tr><td>복도·현관 밝기 원격 관측</td><td>조도 → WiFi → 실시간 그래프</td><td>#3</td></tr>
+    <tr><td>실험 데이터 자동 기록기</td><td>여러 센서 → 시리얼/WiFi → CSV</td><td>#1·#3 확장</td></tr>
+  </table>
+
+  <h3><span class="num">6-3</span>평가 루브릭 &amp; 발표 체크</h3>
+  <table>
+    <tr><th style="width:150px">평가 항목</th><th>상 (3)</th><th>중 (2)</th><th>하 (1)</th></tr>
+    <tr><td>문제·데이터 정의</td><td>목적·수집 데이터가 명확</td><td>일반적</td><td>모호</td></tr>
+    <tr><td>통신·설계 근거</td><td>이론으로 선택 이유 설명</td><td>일부 설명</td><td>근거 약함</td></tr>
+    <tr><td>수집 구현</td><td>안정적으로 수집·전송</td><td>가끔 끊김</td><td>미완성</td></tr>
+    <tr><td>저장·시각화·해석</td><td>CSV+그래프+해석까지</td><td>일부만</td><td>없음</td></tr>
+    <tr><td>확장·창의성</td><td>예제를 창의적으로 확장</td><td>일부 변형</td><td>예제 그대로</td></tr>
+    <tr><td>발표</td><td>원리·결과를 설득력 있게</td><td>동작 설명</td><td>설명 부족</td></tr>
+  </table>
+  <div class="box"><ul class="check">
+  <li>센서 값이 시리얼/WiFi로 안정적으로 들어오는가</li>
+  <li>CSV 파일이 생성되고 열 구성(형식)이 알맞은가</li>
+  <li>그래프로 데이터 경향을 볼 수 있는가</li>
+  <li>통신 방식·샘플링 주기를 왜 그렇게 골랐는지 설명할 수 있는가</li>
+  <li>바탕 예제에서 최소 1가지 이상 확장했는가</li>
+  </ul></div>
+  </div>
+</section>
+
+<!-- ============ 부록 (자료실) ============ -->
+<section class="part" id="appendix">
+  <div class="part-head" style="border-left-color:#64748b;background:linear-gradient(90deg,#f1f5f9,#fff 70%)">
+    <div class="ses" style="color:#475569">부록 · 자료실</div><h2>참고 자료 &amp; 레퍼런스</h2>
+  </div>
+  <div class="part-body">
+  <p style="color:var(--muted)">학생들이 산출물을 만들며 찾아볼 수 있는 참고 자료입니다.</p>
+
+  <h3 id="appendixA"><span class="num">A</span>통신 프로토콜 비교 (UART·I2C·SPI)</h3>
+  <table>
+    <tr><th style="width:90px">항목</th><th>UART(시리얼)</th><th>I2C</th><th>SPI</th></tr>
+    <tr><td>선 수</td><td>2 (TX·RX)+GND</td><td>2 (SDA·SCL)</td><td>4 (MOSI·MISO·SCK·SS)</td></tr>
+    <tr><td>동기</td><td>비동기</td><td>동기</td><td>동기</td></tr>
+    <tr><td>연결</td><td>1:1</td><td>1:다(주소)</td><td>1:다(SS)</td></tr>
+    <tr><td>속도</td><td>보통</td><td>보통</td><td>빠름</td></tr>
+    <tr><td>예</td><td>PC 통신, GPS</td><td>온습도·기압·IMU</td><td>OLED·SD카드</td></tr>
+  </table>
+
+  <h3 id="appendixB"><span class="num">B</span>무선 통신 기술 비교</h3>
+  <table>
+    <tr><th style="width:90px">기술</th><th>주파수</th><th>거리</th><th>속도</th><th>전력</th><th>대표 용도</th></tr>
+    <tr><td>WiFi</td><td>2.4/5GHz</td><td>수십m+</td><td>높음</td><td>높음</td><td>인터넷·영상·원격</td></tr>
+    <tr><td>BLE</td><td>2.4GHz</td><td>~10m</td><td>낮음</td><td>매우 낮음</td><td>웨어러블·센서</td></tr>
+    <tr><td>Zigbee</td><td>2.4GHz</td><td>10~100m</td><td>낮음</td><td>낮음</td><td>스마트홈 메시</td></tr>
+    <tr><td>LoRa</td><td>서브GHz</td><td>수 km</td><td>매우 낮음</td><td>초저전력</td><td>광역·환경</td></tr>
+    <tr><td>NFC</td><td>13.56MHz</td><td>~수 cm</td><td>낮음</td><td>낮음</td><td>태그·결제</td></tr>
+  </table>
+
+  <h3 id="appendixC"><span class="num">C</span>WiFi·네트워크 용어</h3>
+  <table>
+    <tr><th style="width:150px">용어</th><th>뜻</th></tr>
+    <tr><td>공유기(AP)</td><td>여러 기기를 하나의 무선 네트워크로 묶는 장치</td></tr>
+    <tr><td>SSID</td><td>WiFi 네트워크(공유기) 이름</td></tr>
+    <tr><td>IP 주소</td><td>네트워크상 기기의 주소 (예: 192.168.0.10)</td></tr>
+    <tr><td>포트(port)</td><td>한 기기 안에서 프로그램을 구분하는 창구 번호 (예: 5000)</td></tr>
+    <tr><td>TCP</td><td>순서·도착을 보장하는 신뢰성 있는 연결형 통신</td></tr>
+    <tr><td>소켓(socket)</td><td>데이터를 주고받는 통신 끝점</td></tr>
+    <tr><td>서버 / 클라이언트</td><td>연결을 기다리는 쪽 / 먼저 접속하는 쪽</td></tr>
+  </table>
+
+  <h3 id="appendixD"><span class="num">D</span>ASCII 코드표 (발췌)</h3>
+  <table>
+    <tr><th>문자</th><th>10진</th><th>16진</th><th>문자</th><th>10진</th><th>16진</th><th>문자</th><th>10진</th><th>16진</th></tr>
+    <tr><td>(space)</td><td>32</td><td>0x20</td><td>0</td><td>48</td><td>0x30</td><td>A</td><td>65</td><td>0x41</td></tr>
+    <tr><td>,</td><td>44</td><td>0x2C</td><td>1</td><td>49</td><td>0x31</td><td>Z</td><td>90</td><td>0x5A</td></tr>
+    <tr><td>.</td><td>46</td><td>0x2E</td><td>9</td><td>57</td><td>0x39</td><td>a</td><td>97</td><td>0x61</td></tr>
+    <tr><td>\n (줄바꿈)</td><td>10</td><td>0x0A</td><td>:</td><td>58</td><td>0x3A</td><td>z</td><td>122</td><td>0x7A</td></tr>
+  </table>
+
+  <h3 id="appendixE"><span class="num">E</span>함수 레퍼런스</h3>
+  <h4>Arduino — 시리얼 · WiFi</h4>
+  <table>
+    <tr><th style="width:280px">함수</th><th>설명</th></tr>
+    <tr><td><code>Serial.begin(9600/115200)</code></td><td>시리얼 통신 시작(보드레이트)</td></tr>
+    <tr><td><code>Serial.println(x)</code></td><td>값+줄바꿈 전송</td></tr>
+    <tr><td><code>analogReadResolution(12)</code></td><td>ESP32 ADC 해상도 12비트</td></tr>
+    <tr><td><code>WiFi.begin(ssid, pw)</code></td><td>WiFi 접속 시작</td></tr>
+    <tr><td><code>WiFi.status()==WL_CONNECTED</code></td><td>연결 완료 확인</td></tr>
+    <tr><td><code>WiFi.localIP()</code></td><td>내 IP 주소</td></tr>
+    <tr><td><code>WiFiServer server(5000)</code> / <code>server.begin()</code></td><td>포트 5000 TCP 서버 열기</td></tr>
+    <tr><td><code>server.available()</code></td><td>접속한 클라이언트 얻기</td></tr>
+    <tr><td><code>client.println(x)</code></td><td>클라이언트로 값 전송</td></tr>
+  </table>
+  <h4>Python — 수집·저장·시각화</h4>
+  <table>
+    <tr><th style="width:300px">함수</th><th>설명</th></tr>
+    <tr><td><code>serial.Serial(port, baud)</code></td><td>시리얼 포트 열기 (pyserial)</td></tr>
+    <tr><td><code>socket.socket(...)</code> / <code>connect((ip,port))</code></td><td>TCP 소켓 만들고 접속</td></tr>
+    <tr><td><code>s.recv(1024).decode()</code></td><td>데이터 받아 문자열로</td></tr>
+    <tr><td><code>pd.DataFrame(...).to_csv(f)</code></td><td>CSV로 저장 (pandas)</td></tr>
+    <tr><td><code>plt.plot(y); plt.show()</code></td><td>선 그래프 (matplotlib)</td></tr>
+  </table>
+
+  <h3 id="appendixF"><span class="num">F</span>UNO R3 vs D1 R32 &amp; 센서</h3>
+  <table>
+    <tr><th style="width:130px">항목</th><th>Arduino UNO R3</th><th>Arduino D1 R32 (ESP32)</th></tr>
+    <tr><td>동작(핀) 전압</td><td>5V</td><td><b>3.3V</b></td></tr>
+    <tr><td>ADC</td><td>10비트(0~1023)</td><td>12비트(0~4095)</td></tr>
+    <tr><td>무선</td><td>없음</td><td><b>WiFi·블루투스 내장</b></td></tr>
+    <tr><td>USB</td><td>Type-B</td><td>micro-USB(CH340)</td></tr>
+    <tr><td>보드레이트(권장)</td><td>9600</td><td>115200</td></tr>
+    <tr><td>적합</td><td>유선·실습</td><td>WiFi·원격·네트워크</td></tr>
+  </table>
+  <p style="color:var(--muted)">사용 가능한 센서(조도·온습도·초음파·진동·소리·토양수분·수위·가스 등)의 <b>이름·기능</b>은 초급 교재 1차시 「센서·액추에이터」 표를 참고하세요. (D1 R32는 3.3V 기준으로 연결)</p>
+
+  <h3 id="appendixG"><span class="num">G</span>문제 해결(트러블슈팅)</h3>
+  <table>
+    <tr><th style="width:250px">증상</th><th>해결</th></tr>
+    <tr><td>글자가 깨져 보임(□©◊)</td><td>보드레이트 불일치 — 아두이노와 모니터/파이썬 속도를 같게(D1 R32는 115200)</td></tr>
+    <tr><td>포트가 안 보임 / 업로드 실패</td><td>CH340 드라이버 설치, BOOT 버튼 누른 채 업로드, 케이블 교체</td></tr>
+    <tr><td>WiFi 연결이 안 됨</td><td>SSID·비밀번호 확인, 2.4GHz 네트워크 사용, 신호 세기 확인</td></tr>
+    <tr><td>파이썬이 접속 안 됨</td><td>보드와 <b>같은 공유기</b>인지, IP·포트 정확한지, 방화벽 확인</td></tr>
+    <tr><td>값이 이상하게 붙어 옴</td><td>TCP는 덩어리로 도착 — <b>줄바꿈(\n) 기준</b>으로 잘라 처리(예제 #3)</td></tr>
+  </table>
+
+  <h3 id="appendixH"><span class="num">H</span>더 배우기 · 참고 링크</h3>
+  <ul>
+  <li>Arduino 언어 레퍼런스 — <a href="https://www.arduino.cc/reference/" target="_blank" rel="noopener">arduino.cc/reference</a></li>
+  <li>Arduino-ESP32(공식) — <a href="https://docs.espressif.com/projects/arduino-esp32/" target="_blank" rel="noopener">docs.espressif.com/…/arduino-esp32</a></li>
+  <li>ESP32 WiFi 예제 — <a href="https://randomnerdtutorials.com/esp32-web-server-arduino-ide/" target="_blank" rel="noopener">randomnerdtutorials.com (ESP32)</a></li>
+  <li>Python socket 문서 — <a href="https://docs.python.org/3/library/socket.html" target="_blank" rel="noopener">docs.python.org/…/socket</a></li>
+  <li>pandas · matplotlib — <a href="https://pandas.pydata.org/docs/" target="_blank" rel="noopener">pandas</a> · <a href="https://matplotlib.org/stable/tutorials/" target="_blank" rel="noopener">matplotlib</a></li>
+  <li>Tinkercad Circuits — <a href="https://www.tinkercad.com/" target="_blank" rel="noopener">tinkercad.com</a></li>
+  </ul>
+  </div>
+</section>
+
+<footer>
+  2026 IoT 캠프 교재 · 주제 2 「사물인터넷 중급(대체 버전) — WiFi 데이터 수집 · Arduino D1 R32」 · 대상: 고등학생<br>
+  기본 버전 → <a href="중급_무선_데이터_수집_장치_제작.html">주제 2 · 중급(XIAO nRF52840 · BLE)</a> · <a href="초급_사물인터넷_센서와_마이크로컨트롤러.html">주제 1 · 초급</a>
+</footer>
+
+</main>
+<script>
+/* 코드 블록 복사 버튼 (copybtn) */
+(function(){
+  var css='.code{position:relative}.code .ch{padding-right:74px}'+
+    '.copybtn{position:absolute;top:6px;right:8px;z-index:3;background:#2a2740;color:#cdd3ea;'+
+    'border:1px solid #46426e;border-radius:7px;padding:3px 11px;font-size:12px;font-weight:700;'+
+    'cursor:pointer;font-family:inherit;line-height:1.4}'+
+    '.copybtn:hover{background:#3a3760}.copybtn.done{color:#a5f3d0;border-color:#2f7a5e}';
+  var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+  function textOf(code){
+    var ls=code.querySelectorAll('.line');
+    if(ls.length) return Array.prototype.map.call(ls,function(l){return l.textContent;}).join('\n');
+    return code.textContent;
+  }
+  document.querySelectorAll('.code').forEach(function(box){
+    var code=box.querySelector('code'); if(!code) return;
+    var btn=document.createElement('button'); btn.type='button'; btn.className='copybtn'; btn.textContent='복사';
+    function done(){ btn.textContent='복사됨 \u2713'; btn.classList.add('done');
+      setTimeout(function(){ btn.textContent='복사'; btn.classList.remove('done'); },1500); }
+    function fallback(t){ var ta=document.createElement('textarea'); ta.value=t;
+      ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.focus(); ta.select();
+      try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta); }
+    btn.addEventListener('click', function(){
+      var t=textOf(code);
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(t).then(done, function(){ fallback(t); });
+      } else { fallback(t); }
+    });
+    box.appendChild(btn);
+  });
+})();
+</script>
+</body>
+</html>

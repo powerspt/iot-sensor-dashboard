@@ -7,6 +7,10 @@ RUN pip install --no-cache-dir flask gunicorn
 # 한글 파일명을 피하기 위해 컨테이너 안에서는 app.py 로 복사해 실행
 COPY v2_server.py /app/app.py
 
+# 교재(서버에서 /textbook 로 서빙)와 교재 이미지
+COPY textbook.html /app/textbook.html
+COPY media/ /app/media/
+
 # 데이터(SQLite)는 /app/data 에 저장 → 볼륨으로 영속화
 ENV DB_PATH=/app/data/dashboard.db
 EXPOSE 8000

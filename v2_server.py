@@ -16,7 +16,7 @@
        (자세한 배포 체크리스트는 함께 제공된 HTML 가이드 참고)
 """
 from flask import (Flask, request, jsonify, session, redirect,
-                   url_for, Response, render_template_string, abort)
+                   url_for, Response, render_template_string, abort, send_from_directory)
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3, datetime, secrets, os, functools, math
 
@@ -173,7 +173,7 @@ def login():
             session["user_id"] = row["id"]
             session["username"] = row["username"]
             session["is_admin"] = bool(row["is_admin"])
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("home"))
         return render_template_string(PAGE_AUTH, mode="login",
                msg="아이디/비밀번호 확인", form=request.form)
     return render_template_string(PAGE_AUTH, mode="login", msg="", form={})
@@ -187,7 +187,29 @@ def logout():
 
 @app.route("/")
 def home():
-    return redirect(url_for("dashboard") if "user_id" in session else url_for("login"))
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    return render_template_string(PAGE_HOME, username=session["username"],
+                                  is_admin=session.get("is_admin", False))
+
+
+BASE_DIR = os.path.dirname(__file__)
+
+
+@app.route("/textbook")
+@login_required
+def textbook():
+    p = os.path.join(BASE_DIR, "textbook.html")
+    if not os.path.exists(p):
+        return "교재 파일(textbook.html)이 서버에 없습니다.", 404
+    with open(p, encoding="utf-8") as f:
+        return Response(f.read(), mimetype="text/html; charset=utf-8")
+
+
+@app.route("/media/<path:fn>")
+@login_required
+def media(fn):
+    return send_from_directory(os.path.join(BASE_DIR, "media"), fn)
 
 
 # ================= API 키 =================
@@ -281,7 +303,8 @@ def my_stats():
                           params).fetchall()
         over = None
         if th not in (None, ""):
-            o = c.execute(f"SELECT COUNT(*) c FROM readings WHERE {where} AND value>=?",
+            op = "<" if request.args.get("thdir") == "under" else ">"   # 미만/초과
+            o = c.execute(f"SELECT COUNT(*) c FROM readings WHERE {where} AND value{op}?",
                           (*params, float(th))).fetchone()
             over = o["c"]
     avg = r["avg"]
@@ -446,6 +469,43 @@ h1{font-size:22px;margin:0 0 10px}p{color:#5f6478;margin:6px 0}a{display:inline-
 <a href="/login">로그인 화면으로</a>
 </div></body></html>"""
 
+PAGE_HOME = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>2026 IoT 캠프 · 홈</title>
+<style>
+:root{--ink:#1b1f33;--muted:#5f6478;--line:#e6e7f0;--brand:#4f46e5;--bg:#f6f7fb;--card:#fff}
+body.dark{--ink:#e7e9f5;--muted:#98a2c4;--line:#2a2f45;--bg:#0f1220;--card:#1a1e2e}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;font-family:"Malgun Gothic",system-ui,sans-serif;background:var(--bg);color:var(--ink);transition:background .2s,color .2s}
+header{background:linear-gradient(135deg,#0e7490,#4338ca);color:#fff;padding:18px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+header h1{margin:0;font-size:20px}header a{color:#eaf6ff;font-size:14px;text-decoration:none;margin-left:6px}
+.htool{display:flex;align-items:center;gap:10px;font-size:14px}
+.iconbtn{background:rgba(255,255,255,.16);color:#fff;border:0;border-radius:9px;padding:6px 10px;cursor:pointer;font-weight:700;font-size:13px}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.hub{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;width:100%;max-width:720px}
+.tile{flex:1 1 280px;max-width:330px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:44px 28px;text-align:center;text-decoration:none;color:var(--ink);box-shadow:0 8px 30px rgba(30,27,75,.07);transition:transform .12s,box-shadow .12s,border-color .12s}
+.tile:hover{transform:translateY(-4px);box-shadow:0 14px 40px rgba(30,27,75,.14);border-color:var(--brand)}
+.tile .emoji{font-size:56px;line-height:1}
+.tile .t{font-size:22px;font-weight:800;margin-top:14px}
+.tile .d{font-size:14px;color:var(--muted);margin-top:8px}
+</style></head><body>
+<header><h1>📡 2026 IoT 캠프</h1>
+  <div class="htool"><b>{{ username }}</b> 님
+    <button class="iconbtn" id="darkBtn" title="다크 모드">🌓</button>
+    {% if is_admin %}<a href="/admin">회원 관리</a>{% endif %}
+    <a href="/logout">로그아웃</a></div></header>
+<main>
+  <div class="hub">
+    <a class="tile" href="/textbook"><div class="emoji">📘</div><div class="t">교재 보러 가기</div><div class="d">WiFi 데이터 수집 · Arduino D1 R32</div></a>
+    <a class="tile" href="/dashboard"><div class="emoji">📈</div><div class="t">센서 대시보드</div><div class="d">내 데이터 실시간 · 누적 조회</div></a>
+  </div>
+</main>
+<script>
+var b=document.getElementById('darkBtn');
+function sd(on){document.body.classList.toggle('dark',on);localStorage.setItem('dash_dark',on?'1':'0');}
+b.addEventListener('click',function(){sd(!document.body.classList.contains('dark'));});
+if(localStorage.getItem('dash_dark')==='1')sd(true);
+</script>
+</body></html>"""
+
 PAGE_DASH = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>내 센서 대시보드</title>
 <style>
@@ -486,7 +546,7 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
 <header><h1>📈 내 센서 대시보드</h1>
   <div class="htool"><b>{{ username }}</b> 님
     <button class="iconbtn" id="darkBtn" title="다크 모드">🌓</button>
-    {% if is_admin %}<a href="/admin">회원 관리</a>{% endif %}
+    <a href="/">홈</a>{% if is_admin %}<a href="/admin">회원 관리</a>{% endif %}
     <a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
   <div class="keybox"><b>내 API 키</b> <span style="color:var(--muted);font-size:13px">(ESP32 코드의 <code>API_KEY</code>에 붙여넣기)</span>
@@ -512,7 +572,8 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
     </select></label>
     <label>보기 <select id="view"><option value="line">라인</option><option value="overlay">겹쳐보기</option><option value="multi">나눠보기</option><option value="hist">분포</option></select></label>
     <label title="겹쳐보기에서 센서별 척도를 0~100%로 맞춤"><input type="checkbox" id="norm"> 정규화</label>
-    <label>임계값 <input type="number" id="th" step="any" placeholder="예: 3000" style="width:92px"></label>
+    <label>임계값 <input type="number" id="th" step="any" placeholder="예: 3000" style="width:92px">
+      <select id="thdir"><option value="over">초과</option><option value="under">미만</option></select></label>
     <label><input type="checkbox" id="ma"> 이동평균</label>
     <label>자동 <select id="auto">
       <option value="0">끄기</option><option value="1000">1초</option>
@@ -535,7 +596,7 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
 <script>
 var $=function(id){return document.getElementById(id);};
 var elS=$('sensor'),elR=$('range'),elB=$('bucket'),elFrom=$('from'),elTo=$('to'),elMonth=$('month'),
-    elTh=$('th'),elMA=$('ma'),elAuto=$('auto'),elView=$('view'),elNorm=$('norm'),chart=$('chart'),lastSeries=[],geo=null;
+    elTh=$('th'),elThdir=$('thdir'),elMA=$('ma'),elAuto=$('auto'),elView=$('view'),elNorm=$('norm'),chart=$('chart'),lastSeries=[],geo=null;
 var PALETTE=['#6366f1','#0ea5e9','#f97316','#16a34a','#e11d48','#a855f7','#eab308','#14b8a6'],
     STATIC_LEGEND='',HIST_LEGEND='<span>막대 = 빈도</span><span><i class="sw" style="background:#f97316"></i>평균</span>';
 function fmt(x){return (x==null)?'-':(Math.round(x*10)/10);}
@@ -560,8 +621,8 @@ function renderHealth(s){var h='';
   if(s.count>1&&s.first_ms&&s.last_ms&&s.last_ms>s.first_ms){var pm=s.count/((s.last_ms-s.first_ms)/60000);
     h+='<span class="pill">수집 속도 <b>'+(pm>=10?Math.round(pm):Math.round(pm*10)/10)+' 개/분</b></span>';}
   var th=getTh();
-  if(th!=null&&s.over!=null){var pct=s.count?Math.round(s.over/s.count*100):0;
-    h+='<span class="pill">임계('+th+') 초과 <b>'+s.over+'회</b> ('+pct+'%)</span>';}
+  if(th!=null&&s.over!=null){var pct=s.count?Math.round(s.over/s.count*100):0,word=(elThdir.value==='under')?'미만':'초과';
+    h+='<span class="pill">임계('+th+') '+word+' <b>'+s.over+'회</b> ('+pct+'%)</span>';}
   $('health').innerHTML=h;}
 function C(){var d=document.body.classList.contains('dark');
   return {line:'#6366f1',area:d?'rgba(99,102,241,.20)':'rgba(99,102,241,.12)',grid:d?'#2a3050':'#eceef7',
@@ -678,7 +739,7 @@ async function loadSensors(){var cur=elS.value;var list=await (await fetch('/api
   if(!list.length){elS.innerHTML='<option value="">(데이터 없음)</option>';return;}
   elS.innerHTML=list.map(function(s){return '<option'+(s===cur?' selected':'')+'>'+s+'</option>';}).join('');}
 async function refresh(){try{var view=elView.value,p=qs(),th=getTh();
-  var s=await (await fetch('/api/my/stats?'+p+(th!=null?('&th='+th):''))).json();
+  var s=await (await fetch('/api/my/stats?'+p+(th!=null?('&th='+th+'&thdir='+elThdir.value):''))).json();
   renderCards(s);renderHealth(s);
   if(view==='overlay'||view==='multi'){
     var list=await (await fetch('/api/my/sensors')).json();
@@ -704,7 +765,7 @@ elR.addEventListener('change',function(){var d=(elR.value==='date');
   elMonth.style.display=(elR.value==='month')?'':'none';
   if(d&&!elFrom.value&&!elTo.value){elFrom.value=dtLocal(Date.now()-3600e3);elTo.value=dtLocal(Date.now());}
   refresh();});
-[elS,elB,elFrom,elTo,elMonth,elTh,elMA,elView,elNorm].forEach(function(e){e.addEventListener('change',refresh);});
+[elS,elB,elFrom,elTo,elMonth,elTh,elThdir,elMA,elView,elNorm].forEach(function(e){e.addEventListener('change',refresh);});
 elAuto.addEventListener('change',reschedule);
 $('refreshBtn').addEventListener('click',tick);
 $('darkBtn').addEventListener('click',function(){setDark(!document.body.classList.contains('dark'));});
