@@ -6,6 +6,7 @@
    - 보드: ESP32 (Arduino D1 R32)  · 보드레이트 115200
    - 준비: 아래 ssid / password / SERVER 를 내 환경에 맞게 수정
    - SERVER 의 IP 는 PC에서 ipconfig 로 확인한 "내 PC의 IP"
+   - 상태 LED(RGB 모듈, 핀 R·G·B·-): 빨강=연결중/실패, 초록=정상, 파랑=전송성공
    ============================================================ */
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -17,13 +18,24 @@ const char* SENSOR   = "light";        // 센서 이름(대시보드 표시용)
 const int   SENSOR_PIN = 34;           // 조도센서 아날로그 입력(IO34)
 const int   PERIOD_MS  = 1000;         // 전송 주기(ms)
 
+// 상태 표시 RGB LED (모듈 핀:  R · G · B · - )   "-"(공통) → GND
+const int LED_R = 16;   // R → IO16
+const int LED_G = 17;   // G → IO17
+const int LED_B = 18;   // B → IO18
+void led(bool r, bool g, bool b) {     // 공통 캐소드 모듈: HIGH = 점등
+  digitalWrite(LED_R, r); digitalWrite(LED_G, g); digitalWrite(LED_B, b);
+}
+
 void setup() {
   Serial.begin(115200);
   analogReadResolution(12);            // ESP32 ADC 12비트(0~4095)
+  pinMode(LED_R, OUTPUT); pinMode(LED_G, OUTPUT); pinMode(LED_B, OUTPUT);
+  led(1, 0, 0);                        // 🔴 WiFi 연결 중
   WiFi.begin(ssid, password);
   Serial.print("WiFi 연결 중");
   while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
   Serial.println("\nWiFi 연결됨. IP: " + WiFi.localIP().toString());
+  led(0, 1, 0);                        // 🟢 WiFi 연결됨
 }
 
 void loop() {
@@ -38,7 +50,11 @@ void loop() {
     int code = http.POST(body);
     Serial.printf("POST %d  %s=%d\n", code, SENSOR, value);
     http.end();
+    if (code == 200) { led(0, 0, 1); delay(120); }   // 🔵 전송 성공 깜빡
+    else             { led(1, 0, 0); delay(120); }   // 🔴 전송 실패
+    led(0, 1, 0);                                     // 🟢 정상 대기
   } else {
+    led(1, 0, 0);                                     // 🔴 WiFi 끊김 → 재연결
     Serial.println("WiFi 끊김 — 재연결 대기");
     WiFi.begin(ssid, password);
   }
