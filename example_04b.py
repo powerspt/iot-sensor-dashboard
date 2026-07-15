@@ -1,4 +1,4 @@
-# example_04.py
+# example_04b.py
 # 교재: Python 모델링 예제 #3 — WiFi 수집 → CSV → 그래프 (짝: 아두이노 example_04.ino)
 # 필요: pip install pandas matplotlib  (socket은 표준 라이브러리)
 import socket, datetime

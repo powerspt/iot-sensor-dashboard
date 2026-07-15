@@ -1,4 +1,4 @@
-# example_03.py
+# example_04a.py
 # 교재: Python 모델링 예제 #2 — WiFi 소켓으로 값 받기 (짝: 아두이노 example_04.ino)
 import socket
 HOST = '192.168.0.10'   # ← 시리얼에 뜬 D1 R32의 IP

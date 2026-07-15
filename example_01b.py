@@ -1,4 +1,4 @@
-# example_02.py
+# example_01b.py
 # 교재: Python 모델링 예제 #1 — 유선 데이터 로거 (짝: 아두이노 example_01.ino)
 # 필요: pip install pyserial pandas matplotlib
 import serial, datetime
