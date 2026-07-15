@@ -195,6 +195,14 @@ def home():
 
 BASE_DIR = os.path.dirname(__file__)
 
+# 교재를 서버에서 서빙할 때만 붙이는 이동 버튼(원본 교재 파일은 건드리지 않음)
+TEXTBOOK_NAV = """
+<div style="position:fixed;bottom:16px;right:16px;z-index:2147483000;display:flex;gap:8px;font-family:system-ui,'Malgun Gothic',sans-serif">
+  <a href="/" style="background:#334155;color:#fff;text-decoration:none;font-weight:700;font-size:13.5px;padding:10px 14px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.22)">🏠 메인</a>
+  <a href="/dashboard" style="background:#4338ca;color:#fff;text-decoration:none;font-weight:700;font-size:13.5px;padding:10px 14px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.22)">📈 대시보드</a>
+</div>
+"""
+
 
 @app.route("/textbook")
 @login_required
@@ -203,7 +211,9 @@ def textbook():
     if not os.path.exists(p):
         return "교재 파일(textbook.html)이 서버에 없습니다.", 404
     with open(p, encoding="utf-8") as f:
-        return Response(f.read(), mimetype="text/html; charset=utf-8")
+        html = f.read()
+    html = html.replace("</body>", TEXTBOOK_NAV + "</body>", 1)   # 이동 버튼 주입
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 
 @app.route("/media/<path:fn>")
