@@ -677,6 +677,7 @@ function outlierInfo(vs){if(vs.length<3)return {n:0,mean:null,sd:0};var m=0;vs.f
   var s=0;vs.forEach(function(v){s+=(v-m)*(v-m);});s=Math.sqrt(s/vs.length);var n=0;
   if(s>0)vs.forEach(function(v){if(Math.abs(v-m)>2.5*s)n++;});return {n:n,mean:m,sd:s};}
 function seriesUrl(nm){var p=new URLSearchParams(qs());p.set('sensor',nm);return '/api/my/series?'+p.toString();}
+function sensorsUrl(){return '/api/my/sensors'+(VIEW_UID?('?uid='+VIEW_UID):'');}  // 관리자 열람 시 대상 회원
 function sensorLegend(maps){var v=maps.filter(function(m){return m.pts&&m.pts.length;});
   if(!v.length)return '<span>데이터 없음</span>';
   return v.map(function(m,i){return '<span><i class="sw" style="background:'+PALETTE[i%PALETTE.length]+'"></i>'+m.name+'</span>';}).join('');}
@@ -782,14 +783,14 @@ function qs(){var p=new URLSearchParams();if(elS.value)p.set('sensor',elS.value)
   if(VIEW_UID)p.set('uid',VIEW_UID);                 // 관리자 열람 시 대상 회원 지정
   return p.toString();}
 async function loadSensors(){var cur=elS.value;
-  var list=await (await fetch('/api/my/sensors'+(VIEW_UID?('?uid='+VIEW_UID):''))).json();
+  var list=await (await fetch(sensorsUrl())).json();
   if(!list.length){elS.innerHTML='<option value="">(데이터 없음)</option>';return;}
   elS.innerHTML=list.map(function(s){return '<option'+(s===cur?' selected':'')+'>'+s+'</option>';}).join('');}
 async function refresh(){try{var view=elView.value,p=qs(),th=getTh();
   var s=await (await fetch('/api/my/stats?'+p+(th!=null?('&th='+th+'&thdir='+elThdir.value):''))).json();
   renderCards(s);renderHealth(s);
   if(view==='overlay'||view==='multi'){
-    var list=await (await fetch('/api/my/sensors')).json();
+    var list=await (await fetch(sensorsUrl())).json();
     var maps=await Promise.all(list.map(function(nm){return fetch(seriesUrl(nm)).then(function(r){return r.json();}).then(function(d){return {name:nm,pts:d};});}));
     lastSeries=[];$('legend').innerHTML=sensorLegend(maps);
     if(view==='overlay')drawOverlay(maps);else drawMulti(maps);
