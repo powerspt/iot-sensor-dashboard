@@ -258,10 +258,21 @@ def api_ingest():
 
 
 # ================= 브라우저 → 서버 : 내 데이터만 =================
+def _target_uid():
+    """조회 대상 사용자 id. 관리자만 ?uid= 로 다른 회원을 볼 수 있고, 그 외에는 항상 본인."""
+    uid = request.args.get("uid")
+    if uid and session.get("is_admin"):
+        try:
+            return int(uid)
+        except ValueError:
+            pass
+    return session["user_id"]
+
+
 def _where():
     """요청 파라미터(sensor, from, to)로 WHERE 절과 값 목록 구성."""
     clauses = ["user_id=?"]
-    params = [session["user_id"]]
+    params = [_target_uid()]
     sensor = request.args.get("sensor")
     if sensor:
         clauses.append("sensor=?"); params.append(sensor)
@@ -278,7 +289,7 @@ def _where():
 def my_sensors():
     with db() as c:
         rows = c.execute("SELECT DISTINCT sensor FROM readings WHERE user_id=? ORDER BY sensor",
-                         (session["user_id"],)).fetchall()
+                         (_target_uid(),)).fetchall()
     return jsonify([r["sensor"] for r in rows])
 
 
@@ -347,7 +358,24 @@ def dashboard():
                          (session["user_id"],)).fetchall()
     return render_template_string(PAGE_DASH, username=session["username"],
                                   keys=[dict(k) for k in keys],
-                                  is_admin=session.get("is_admin", False))
+                                  is_admin=session.get("is_admin", False),
+                                  view_uid=None, view_name="")
+
+
+@app.route("/admin/view/<int:uid>")
+@admin_required
+def admin_view(uid):
+    """관리자가 특정 회원이 수집한 데이터를 대시보드로 열람."""
+    with db() as c:
+        u = c.execute("SELECT username, name, org FROM users WHERE id=?", (uid,)).fetchone()
+    if not u:
+        return "존재하지 않는 회원입니다.", 404
+    label = (u["name"] or u["username"])
+    if u["org"]:
+        label += f" ({u['org']})"
+    return render_template_string(PAGE_DASH, username=session["username"],
+                                  keys=[], is_admin=True,
+                                  view_uid=uid, view_name=label)
 
 
 def _new_key(c, uid, label="기본 키"):
@@ -559,10 +587,15 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
     <a href="/">홈</a>{% if is_admin %}<a href="/admin">회원 관리</a>{% endif %}
     <a href="/logout">로그아웃</a></div></header>
 <div class="wrap">
+  {% if view_uid %}
+  <div class="keybox" style="background:#fffbeb;border-color:#fcd34d">👤 <b>관리자 보기</b> — <b>{{ view_name }}</b> 님이 수집한 데이터입니다.
+    <a href="/admin" style="color:#92400e;font-weight:700;margin-left:6px">← 회원 관리로</a></div>
+  {% else %}
   <div class="keybox"><b>내 API 키</b> <span style="color:var(--muted);font-size:13px">(ESP32 코드의 <code>API_KEY</code>에 붙여넣기)</span>
     {% for k in keys %}<div style="margin-top:8px"><code>{{ k.key }}</code> <span style="color:var(--muted);font-size:13px">— {{ k.label }}</span><button class="mini" onclick="copyKey('{{ k.key }}',this)">복사</button></div>{% endfor %}
     <form method="post" action="/keys/new" style="margin-top:10px"><button class="act" type="submit">+ 새 키 발급</button></form>
   </div>
+  {% endif %}
   <div class="ctrl">
     <label>센서 <select id="sensor"></select></label>
     <label>범위 <select id="range">
@@ -607,6 +640,7 @@ button.act{background:var(--brand);color:#fff;border:0;border-radius:10px;paddin
 var $=function(id){return document.getElementById(id);};
 var elS=$('sensor'),elR=$('range'),elB=$('bucket'),elFrom=$('from'),elTo=$('to'),elMonth=$('month'),
     elTh=$('th'),elThdir=$('thdir'),elMA=$('ma'),elAuto=$('auto'),elView=$('view'),elNorm=$('norm'),chart=$('chart'),lastSeries=[],geo=null;
+var VIEW_UID={% if view_uid %}{{ view_uid }}{% else %}null{% endif %};   // 관리자가 특정 회원을 볼 때만 값이 있음
 var PALETTE=['#6366f1','#0ea5e9','#f97316','#16a34a','#e11d48','#a855f7','#eab308','#14b8a6'],
     STATIC_LEGEND='',HIST_LEGEND='<span>막대 = 빈도</span><span><i class="sw" style="background:#f97316"></i>평균</span>';
 function fmt(x){return (x==null)?'-':(Math.round(x*10)/10);}
@@ -744,8 +778,11 @@ function range_(){var r=elR.value,now=Date.now(),from=null,to=null;
   return {from:from,to:to};}
 function qs(){var p=new URLSearchParams();if(elS.value)p.set('sensor',elS.value);
   var rg=range_();if(rg.from)p.set('from',Math.floor(rg.from));if(rg.to)p.set('to',Math.floor(rg.to));
-  p.set('bucket',elB.value);p.set('limit',(elR.value==='recent')?'150':'3000');return p.toString();}
-async function loadSensors(){var cur=elS.value;var list=await (await fetch('/api/my/sensors')).json();
+  p.set('bucket',elB.value);p.set('limit',(elR.value==='recent')?'150':'3000');
+  if(VIEW_UID)p.set('uid',VIEW_UID);                 // 관리자 열람 시 대상 회원 지정
+  return p.toString();}
+async function loadSensors(){var cur=elS.value;
+  var list=await (await fetch('/api/my/sensors'+(VIEW_UID?('?uid='+VIEW_UID):''))).json();
   if(!list.length){elS.innerHTML='<option value="">(데이터 없음)</option>';return;}
   elS.innerHTML=list.map(function(s){return '<option'+(s===cur?' selected':'')+'>'+s+'</option>';}).join('');}
 async function refresh(){try{var view=elView.value,p=qs(),th=getTh();
@@ -810,6 +847,7 @@ tbody tr:hover td,table tr:hover td{background:var(--soft)}
 form.inline{display:inline}
 button{border:0;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer}
 .ok{background:#16a34a;color:#fff}.no{background:#e11d48;color:#fff;margin-left:6px}.info{background:#0284c7;color:#fff}
+a.abtn{display:inline-block;background:var(--brand);color:#fff;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13px;text-decoration:none;margin-right:6px}
 .create{display:grid;grid-template-columns:repeat(5,1fr) auto;gap:8px;padding:14px}
 .create input{padding:9px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;width:100%;background:var(--card);color:var(--ink)}
 @media(max-width:760px){.create{grid-template-columns:1fr 1fr}}</style></head><body>
@@ -849,17 +887,17 @@ button{border:0;border-radius:8px;padding:7px 12px;font-weight:700;font-size:13p
 
   <h2>회원 목록 · 수집 현황 <span class="muted" style="font-size:13px;font-weight:400">(총 {{ members|length }}명)</span></h2>
   <div class="panel"><table>
-  <tr><th>이름</th><th>소속</th><th>아이디</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th><th style="width:210px">관리</th></tr>
+  <tr><th>이름</th><th>소속</th><th>아이디</th><th>샘플 수</th><th>최근값</th><th>최근 시각</th><th style="width:320px">관리</th></tr>
   {% for m in members %}<tr>
   <td>{{ m.name or '-' }}{% if m.is_admin %}<span class="tag">admin</span>{% endif %}</td>
   <td>{{ m.org or '-' }}</td><td>{{ m.username }}</td>
   <td>{% if m.n %}<span class="on">{{ m.n }}</span>{% else %}<span class="off">0</span>{% endif %}</td>
   <td>{{ '%.1f'|format(m.last_v) if m.last_v is not none else '-' }}</td>
   <td>{{ m.last_ts or '-' }}</td>
-  <td>{% if not m.is_admin %}
+  <td><a class="abtn" href="/admin/view/{{ m.id }}">📈 데이터 보기</a>{% if not m.is_admin %}
   <form class="inline" method="post" action="/admin/reset_password"><input type="hidden" name="user_id" value="{{ m.id }}"><button class="info">비번 초기화</button></form>
   <form class="inline" method="post" action="/admin/delete" onsubmit="return confirm('{{ m.username }} 계정과 데이터를 삭제할까요?')"><input type="hidden" name="user_id" value="{{ m.id }}"><button class="no">삭제</button></form>
-  {% else %}<span class="muted">—</span>{% endif %}</td>
+  {% endif %}</td>
   </tr>{% endfor %}
   </table></div>
 </div>
