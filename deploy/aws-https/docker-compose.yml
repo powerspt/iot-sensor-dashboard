@@ -1,0 +1,46 @@
+# ============================================================
+# 배포 C · AWS(클라우드) + 도메인 + 자동 HTTPS (Caddy)
+# ------------------------------------------------------------
+#  공인 IP가 있는 클라우드(AWS EC2/Lightsail 등)에 도메인을 붙이고,
+#  Caddy가 Let's Encrypt 인증서를 자동 발급·갱신해 https://내도메인 으로 공개.
+#  (Cloudflare Tunnel 없이 서버가 직접 443을 서비스)
+#
+#  준비: 도메인 A레코드 → 서버 공인 IP(탄력적 IP 권장), 보안그룹 80·443 개방
+#  실행(레포 루트 기준):
+#    cp deploy/aws-https/.env.example deploy/aws-https/.env   # DOMAIN·SECRET_KEY 등 채우기
+#    docker compose -f deploy/aws-https/docker-compose.yml up -d --build
+# ============================================================
+services:
+  dashboard:
+    build: ../../server
+    container_name: sensor-dash
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_PATH=/app/data/dashboard.db
+      - ADMIN_USER=${ADMIN_USER:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    volumes:
+      - ../../data:/app/data               # 데이터 영속(레포 루트 data/)
+    expose:
+      - "8000"                             # 외부로 직접 열지 않음 — Caddy를 통해서만
+
+  caddy:
+    image: caddy:2
+    container_name: sensor-caddy
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+    environment:
+      - DOMAIN=${DOMAIN}                    # Caddyfile 이 {$DOMAIN} 으로 사용
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                   # 발급받은 인증서 영속(중요)
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

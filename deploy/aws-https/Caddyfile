@@ -1,0 +1,6 @@
+# 도메인은 .env 의 DOMAIN 값으로 치환됩니다 (Caddy 환경변수 문법 {$VAR}).
+# Caddy가 이 도메인으로 Let's Encrypt 인증서를 자동 발급·갱신하고,
+# 들어온 요청을 대시보드 컨테이너(dashboard:8000)로 넘깁니다.
+{$DOMAIN} {
+    reverse_proxy dashboard:8000
+}

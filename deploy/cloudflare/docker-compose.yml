@@ -1,0 +1,40 @@
+# ============================================================
+# 배포 A · Docker + Cloudflare Tunnel
+# ------------------------------------------------------------
+#  공인 IP·포트포워딩 없이 "내 도메인 + 자동 HTTPS"로 공개.
+#  학교 내부망·가정집(공유기 뒤)에서도 동작 — 서버가 밖으로 나가는
+#  연결만 만들기 때문.
+#
+#  실행(레포 루트 기준):
+#    cp deploy/cloudflare/.env.example deploy/cloudflare/.env   # 값 채우기
+#    docker compose -f deploy/cloudflare/docker-compose.yml up -d --build
+#
+#  Cloudflare 대시보드에서 이 터널의 Public hostname 을
+#    dashboard.<내도메인>  →  Service: http://dashboard:8000
+#  으로 설정하면 https://dashboard.<내도메인> 으로 접속됩니다.
+# ============================================================
+services:
+  dashboard:
+    build: ../../server
+    container_name: sensor-dash
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=${SECRET_KEY}           # 세션 비밀키(고정·랜덤)
+      - DB_PATH=/app/data/dashboard.db
+      - ADMIN_USER=${ADMIN_USER:-}         # (선택) 관리자 계정 자동 생성
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    volumes:
+      - ../../data:/app/data               # 데이터 영속(레포 루트 data/)
+    # 외부로 포트를 열지 않음 — 접근은 cloudflared를 통해서만.
+    expose:
+      - "8000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}       # Cloudflare Zero Trust에서 발급
+    depends_on:
+      - dashboard
