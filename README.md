@@ -112,6 +112,10 @@ docker compose -f deploy/direct-ip/docker-compose.yml up -d --build
 | 장치 | Arduino IDE 2.x + ESP32 보드 패키지 (+ Windows는 CP210x/CH340 드라이버) | [firmware/README §0](firmware/README.md) |
 | 하드웨어 | ESP32 보드(Arduino D1 R32 등), 조도센서(CDS)+1kΩ, 점퍼선 | [firmware/README](firmware/README.md) |
 
+## 🙋 만든 사람
+
+**박정호** · 세종 온라인학교 · <powerspty@gmail.com>
+
 ## 📄 라이선스
 
 MIT — 교육 목적의 수정·재배포를 환영합니다.
